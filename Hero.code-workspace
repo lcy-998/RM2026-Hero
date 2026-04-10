@@ -1,0 +1,53 @@
+{
+    "folders": [
+        {
+            "path": "."
+        }
+    ],
+    "settings": {
+        "files.associations": {
+            "main.h": "c",
+            "shoot.h": "c",
+            "dji_motor.h": "c",
+            "robot_cmd.h": "c",
+            "chassis.h": "c",
+            "led.h": "c",
+            "robot_def.h": "c",
+            "ist8310.h": "c",
+            "limits": "cpp",
+            "ahrs.h": "c",
+            "ahrs_middleware.h": "c",
+            "usbd_cdc_if.h": "c",
+            "usbd_cdc.h": "c",
+            "robot_test.h": "c",
+            "fifo.h": "c",
+            "kalman_filter.h": "c",
+            "arm_math.h": "c",
+            "bsp_usart.h": "c",
+            "bmi088_regndef.h": "c",
+            "gimbal.h": "c",
+            "vofa.h": "c",
+            "referee_init.h": "c",
+            "memory.h": "c",
+            "hwt606.h": "c",
+            "cstdlib": "c",
+            "iic_control.h": "c",
+            "stdint.h": "c",
+            "master_process.h": "c",
+            "ins_task.h": "c",
+            "bmi088.h": "c",
+            "tool.h": "c",
+            "rm_referee.h": "c",
+            "user_lib.h": "c",
+            "cmath": "c",
+            "omni_ui.h": "c",
+            "buzzer.h": "c",
+            "super_cap.h": "c",
+            "pm01_api.h": "c",
+            "xutility": "c",
+            "bsp_dwt.h": "c",
+            "controller.h": "c"
+        }
+    },
+    "extensions": {}
+}
