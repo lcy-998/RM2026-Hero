@@ -666,6 +666,8 @@ void RobotCMDTask()
         RemoteControlSet();
         PitchAngleLimit();
     }
+    gimbal_cmd_send.pitch_target_speed = vision_recv_data.pitch_vel;
+    gimbal_cmd_send.yaw_target_speed = vision_recv_data.yaw_vel;
     VisionSendMessage();
     GimbalBoardSend();
 #endif

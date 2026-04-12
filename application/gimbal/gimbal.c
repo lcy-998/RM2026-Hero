@@ -20,11 +20,12 @@ static attitude_t *gimbal_IMU_data;
 #ifdef GIMBAL_BOARD
 static DJIMotorInstance *pitch_motor;
 static float pitch_current_feedforward = 0.0f;
+static float pitch_speed_feedforward = 0.0f;
 #endif
 
 #ifdef CHASSIS_BOARD
 static DJIMotorInstance *yaw_motor;
-
+static float yaw_speed_feedforward = 0.0f;
 #endif
 
 void GimbalInit()
@@ -59,6 +60,7 @@ void GimbalInit()
             },
             .other_angle_feedback_ptr = &gimbal_cmd_recv.yaw_actual_angle,
             .other_speed_feedback_ptr = &gimbal_cmd_recv.yaw_actual_speed,
+            .speed_feedforward_ptr    = &yaw_speed_feedforward,
         },
         .controller_setting_init_config = {
             .angle_feedback_source = OTHER_FEED,
@@ -66,7 +68,7 @@ void GimbalInit()
             .outer_loop_type       = ANGLE_LOOP,
             .close_loop_type       = ANGLE_LOOP | SPEED_LOOP,
             .motor_reverse_flag    = MOTOR_DIRECTION_NORMAL,
-            .feedforward_flag  =CURRENT_FEEDFORWARD,
+            .feedforward_flag      = CURRENT_FEEDFORWARD | SPEED_FEEDFORWARD,
         },
         .motor_type = GM6020};
         yaw_motor   = DJIMotorInit(&yaw_config);
@@ -96,6 +98,7 @@ void GimbalInit()
                 .MaxOut        = 16384,//24000,
                 
             },
+            .speed_feedforward_ptr = &pitch_speed_feedforward,
             .other_angle_feedback_ptr = &gimbal_IMU_data->Pitch,
            .other_speed_feedback_ptr = &gimbal_IMU_data->Gyro[INS_PITCH_ADDRESS_OFFSET],
         },
@@ -105,7 +108,7 @@ void GimbalInit()
             .outer_loop_type       = ANGLE_LOOP,
             .close_loop_type       = SPEED_LOOP | ANGLE_LOOP,
             .motor_reverse_flag    = MOTOR_DIRECTION_NORMAL,
-            .feedforward_flag      = CURRENT_FEEDFORWARD,
+            .feedforward_flag      = CURRENT_FEEDFORWARD | SPEED_FEEDFORWARD,
         },
         .motor_type = GM6020,
        
@@ -156,6 +159,16 @@ switch (gimbal_cmd_recv.gimbal_mode) {
         default:
             break;
     }
+
+    if (gimbal_cmd_recv.auto_aim_mode == AUTO_AIM_ON)
+    {
+        yaw_speed_feedforward = gimbal_cmd_recv.yaw_target_speed;
+    }
+    else
+    {
+        yaw_speed_feedforward = 0.0f;
+    }
+
     gimbal_feedback_data.yaw_ecd = yaw_motor->measure.ecd;
     gimbal_feedback_data.yaw_motor_single_round_angle = yaw_motor->measure.angle_single_round;
 #endif
@@ -181,6 +194,15 @@ switch (gimbal_cmd_recv.gimbal_mode) {
             break;
         default:
             break;
+    }
+
+    if (gimbal_cmd_recv.auto_aim_mode == AUTO_AIM_ON)
+    {
+        pitch_speed_feedforward = gimbal_cmd_recv.pitch_target_speed;
+    }
+    else
+    {
+        pitch_speed_feedforward = 0.0f;
     }
 
     gimbal_feedback_data.pitch_ecd = pitch_motor->measure.ecd;
