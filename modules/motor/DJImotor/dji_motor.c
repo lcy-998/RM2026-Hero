@@ -52,10 +52,10 @@ static CANInstance sender_assignment[6] = {
     [0] = {.can_handle = &hcan1, .txconf.StdId = 0x1FF, .txconf.IDE = CAN_ID_STD, .txconf.RTR = CAN_RTR_DATA, .txconf.DLC = 0x08, .tx_buff = {0}},
     [1] = {.can_handle = &hcan1, .txconf.StdId = 0x200, .txconf.IDE = CAN_ID_STD, .txconf.RTR = CAN_RTR_DATA, .txconf.DLC = 0x08, .tx_buff = {0}},
     [2] = {.can_handle = &hcan1, .txconf.StdId = 0x2fe, .txconf.IDE = CAN_ID_STD, .txconf.RTR = CAN_RTR_DATA, .txconf.DLC = 0x08, .tx_buff = {0}},
-    [3] = {.can_handle = &hcan2, .txconf.StdId = 0x200, .txconf.IDE = CAN_ID_STD, .txconf.RTR = CAN_RTR_DATA, .txconf.DLC = 0x08, .tx_buff = {0}},
+    [3] = {.can_handle = &hcan2, .txconf.StdId = 0x1ff, .txconf.IDE = CAN_ID_STD, .txconf.RTR = CAN_RTR_DATA, .txconf.DLC = 0x08, .tx_buff = {0}},
     [4] = {.can_handle = &hcan2, .txconf.StdId = 0x200, .txconf.IDE = CAN_ID_STD, .txconf.RTR = CAN_RTR_DATA, .txconf.DLC = 0x08, .tx_buff = {0}},
     [5] = {.can_handle = &hcan2, .txconf.StdId = 0x1fe, .txconf.IDE = CAN_ID_STD, .txconf.RTR = CAN_RTR_DATA, .txconf.DLC = 0x08, .tx_buff = {0}},
-  };
+  };                                                                          
 #endif
 
 /**
@@ -221,85 +221,9 @@ DJIMotorInstance *DJIMotorInit(Motor_Init_Config_s *config)
 
     DJIMotorStop(instance);
     dji_motor_instance[idx++] = instance;
-#if defined(CHASSIS_BOARD)
-    // if(DM_ready==0)
-    // {
-        // CAN_FilterTypeDef can_filter_conf_DM;
-        // static uint8_t can1_filter_idx = 0, can2_filter_idx = 14; // 0-13给can1用,14-27给can2用
-        // can_filter_conf_DM.FilterMode = CAN_FILTERMODE_IDLIST;                                                       // 使用id list模式,即只有将rxid添加到过滤器中才会接收到,其他报文会被过滤
-        // can_filter_conf_DM.FilterScale = CAN_FILTERSCALE_16BIT;                                                      // 使用16位id模式,即只有低16位有效
-        // can_filter_conf_DM.FilterFIFOAssignment =1 ? CAN_RX_FIFO0 : CAN_RX_FIFO1;                                    // 奇数id的模块会被分配到FIFO0,偶数id的模块会被分配到FIFO1
-        // can_filter_conf_DM.SlaveStartFilterBank = 14;                                                                // 从第14个过滤器开始配置从机过滤器(在STM32的BxCAN控制器中CAN2是CAN1的从机)
-        // can_filter_conf_DM.FilterIdLow = 0x11 << 5;                                                      // 过滤器寄存器的低16位,因为使用STDID,所以只有低11位有效,高5位要填0
-        // can_filter_conf_DM.FilterBank = 27;//_instance->can_handle == &hcan1 ? (can1_filter_idx++) : (can2_filter_idx++); // 根据can_handle判断是CAN1还是CAN2,然后自增
-        // can_filter_conf_DM.FilterActivation = CAN_FILTER_ENABLE;                                                     // 启用过滤器
-        // HAL_CAN_ConfigFilter(&hcan2, &can_filter_conf_DM);
-        // DM_ready=1;
-    // }
-#endif
+
     return instance;
 }
-
-// int float_to_uint(float x_float, float x_min, float x_max, int bits)
-// {
-//     /* Converts a float to an unsigned int, given range and number of bits */
-//     float span = x_max - x_min;
-//     float offset = x_min;
-//     return (int) ((x_float-offset)*((float)((1<<bits)-1))/span);
-// }
-
-
-//达妙电机控制
-// void DM4310_mit_ctrl(uint16_t motor_id, float pos, float vel,float kp, float kd, float tor)
-// {   
-//     uint8_t data[8];
-//     uint16_t pos_tmp,vel_tmp,kp_tmp,kd_tmp,tor_tmp;
-//     uint16_t id = motor_id + 0x00;
-
-//     pos_tmp = float_to_uint(pos, -12.5, 12.5, 16);
-//     vel_tmp = float_to_uint(vel, -45.0, 45.0, 12);
-//     tor_tmp = float_to_uint(tor, -18.0, 18.0, 12);
-//     kp_tmp  = float_to_uint(kp,  0.0, 500.0, 12);
-//     kd_tmp  = float_to_uint(kd,  0.0, 5.0, 12);
-
-//     data[0] = (pos_tmp >> 8);
-//     data[1] = pos_tmp;
-//     data[2] = (vel_tmp >> 4);
-//     data[3] = ((vel_tmp&0xF)<<4)|(kp_tmp>>8);
-//     data[4] = kp_tmp;
-//     data[5] = (kd_tmp >> 4);
-//     data[6] = ((kd_tmp&0xF)<<4)|(tor_tmp>>8);
-//     data[7] = tor_tmp;
-
-//     memcpy(sender_assignment[6].tx_buff,&data,8);
-// }
-
-
-// void pos_ctrl(uint16_t motor_id, float pos, float vel)
-// {
-//     uint16_t id;
-//     uint8_t *pbuf, *vbuf;
-//     uint8_t data[8];
-    
-//     id = motor_id + 0x100;
-//     pbuf=(uint8_t*)&pos;
-//     vbuf=(uint8_t*)&vel;
-    
-//     data[0] = *pbuf;
-//     data[1] = *(pbuf+1);
-//     data[2] = *(pbuf+2);
-//     data[3] = *(pbuf+3);
-
-//     data[4] = *vbuf;
-//     data[5] = *(vbuf+1);
-//     data[6] = *(vbuf+2);
-//     data[7] = *(vbuf+3);
-    
-//     memcpy(sender_assignment[6].tx_buff,&data,8);
-// }
-
-
-
 
 /* 电流只能通过电机自带传感器监测,后续考虑加入力矩传感器应变片等 */
 void DJIMotorChangeFeed(DJIMotorInstance *motor, Closeloop_Type_e loop, Feedback_Source_e type)
@@ -335,10 +259,7 @@ void DJIMotorSetRef(DJIMotorInstance *motor, float ref)
     motor->motor_controller.pid_ref = ref;
 }
 
-extern uint8_t vision_send_data[10];
-extern float nuc_version_control[2];//0是pitch，1是yaw
-float pitch_angle_out,pitch_speed_out,pitch_angle_measure,pitch_speed_measure;
-int IfCANTransmit;
+
 uint8_t group, num,ys; // 电机组号和组内编号
 float motorset[4];float pid_measure, pid_ref;             // 电机PID测量值和设定值
 
@@ -402,6 +323,9 @@ void DJIMotorControl()
         if(pid_ref>16384)       pid_ref=16384;
         else if(pid_ref<-16384) pid_ref=-16384;
         set = (int16_t)pid_ref;
+
+        if (motor->stop_flag == MOTOR_STOP)
+            set = 0;
 #ifdef SAMPLING
         set = (int16_t)motor_controller->pid_ref;
 #endif
@@ -423,8 +347,6 @@ void DJIMotorControl()
             
         }
 #endif
-        if (motor->stop_flag == MOTOR_STOP)
-            memset(sender_assignment[group].tx_buff + 2 * num, 0, 16u);
     }
     
 #if defined(ONE_BOARD) || defined(CHASSIS_BOARD)

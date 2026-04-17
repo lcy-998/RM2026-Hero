@@ -47,42 +47,22 @@ void RobotInit()
     buzzer_one_note(Do_freq, 0.1f);
     RobotCMDInit();
     GimbalInit();
+    buzzer_one_note(Re_freq, 0.1f);
     ShootInit();
 #if defined(ONE_BOARD) || defined(GIMBAL_BOARD)
-    buzzer_one_note(Re_freq, 0.1f);
-    buzzer_one_note(Mi_freq, 0.1f);
-    C_board_LEDSet(0x00FF00);
-    buzzer_one_note(Fa_freq, 0.1f);
+    buzzer_one_note(So_freq, 0.1f);
 #endif
 
 #if defined(ONE_BOARD) || defined(CHASSIS_BOARD)
     ChassisInit();
     buzzer_one_note(So_freq, 0.1f);
-    // UI_Init();
     HAL_GPIO_WritePin(GPIOE,GPIO_PIN_9,GPIO_PIN_SET);
 #endif
 
     // // 初始化完成,开启中断
      __enable_irq();
 }
-// #if defined(ONE_BOARD) || defined(GIMBAL_BOARD)
-// void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
-// {
-//   if(huart==&huart1)
-//   {
-//     HAL_GPIO_WritePin(GPIOE,GPIO_PIN_13,GPIO_PIN_RESET);
-//   }
-// }
-// #endif  
-// #if defined(ONE_BOARD) || defined(CHASSIS_BOARD)
-// void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
-// {
-//   if(huart==&huart1)
-//   {
-//     HAL_GPIO_WritePin(GPIOE,GPIO_PIN_9,GPIO_PIN_RESET);
-//   }
-// }
-// #endif  
+
 void RobotTask()
 {
  #if defined(ONE_BOARD) || defined(GIMBAL_BOARD)
@@ -96,22 +76,3 @@ void RobotTask()
  #endif
     
 }
-
-// void Laser_Init()
-// {
-//     RCC->AHB1ENR |= RCC_AHB1ENR_GPIOCEN;  // 使能GPIOC时钟
-//     GPIOC->MODER &= ~(0x3 << (2 * 8));         // 清除PC8的模式位
-//     GPIOC->MODER |= (0x1 << (2 * 8));          // 配置为输出模式 (01)
-//     GPIOC->OTYPER &= ~(0x1 << 8);              // 配置为推挽输出（0）
-//     GPIOC->OSPEEDR |= (0x3 << (2 * 8));        // 设置输出速度为高速
-//     GPIOC->ODR &= (0x1 << 8);  // 设置PC8为高电平
-   
-// }
-// void Laser_on()
-// {
-//     GPIOC->ODR |= (0x1 << 8);  // 设置PC8为高电平
-// }
-// void Laser_off()
-// {
-//     GPIOC->ODR &= (0x1 << 8);  // 设置PC8为高电平
-// }

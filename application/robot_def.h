@@ -3,8 +3,8 @@
 #include "stdint.h"
 #include "ins_task.h"
 
-//#define CHASSIS_BOARD //底盘板
-#define GIMBAL_BOARD  //云台板
+#define CHASSIS_BOARD //底盘板
+//#define GIMBAL_BOARD  //云台板
 
 #define YAW_K                  0.00025f
 #define PITCH_K                0.00025f
