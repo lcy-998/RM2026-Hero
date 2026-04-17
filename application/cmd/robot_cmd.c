@@ -186,7 +186,7 @@ static void VisionRecvCallback()
 
     if (!communication_flag.vision_connect_flag)
     {
-        buzzer_one_note(So_freq, 0.1F);
+        
         communication_flag.vision_connect_flag = 1;
     }
 }
@@ -346,8 +346,8 @@ static void RemoteControlSet()
     
     if (gimbal_cmd_send.auto_aim_mode == AUTO_AIM_ON && communication_flag.vision_detect_flag)
     {
-        pitch_control = vision_send_packet.pitch * RAD_2_DEGREE;
-        yaw_control = vision_send_packet.yaw * RAD_2_DEGREE;
+        pitch_control = vision_recv_data.pitch * RAD_2_DEGREE;
+        yaw_control = vision_recv_data.yaw * RAD_2_DEGREE;
     }
     else{
         pitch_control += /*0.1**/PITCH_K* (float)rc_data[TEMP].rc.rocker_l1 ;
@@ -421,8 +421,8 @@ static void GimbalSet()
         gimbal_cmd_send.auto_aim_mode = AUTO_AIM_ON;
         if (communication_flag.vision_detect_flag)
         {
-            pitch_control = vision_send_packet.pitch * RAD_2_DEGREE;
-            yaw_control = vision_send_packet.yaw * RAD_2_DEGREE;
+            pitch_control = vision_recv_data.pitch * RAD_2_DEGREE;
+            yaw_control = vision_recv_data.yaw * RAD_2_DEGREE;
         }
         else
         {
