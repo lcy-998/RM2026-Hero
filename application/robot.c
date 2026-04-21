@@ -65,24 +65,7 @@ void RobotInit()
     // // 初始化完成,开启中断
      __enable_irq();
 }
-// #if defined(ONE_BOARD) || defined(GIMBAL_BOARD)
-// void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
-// {
-//   if(huart==&huart1)
-//   {
-//     HAL_GPIO_WritePin(GPIOE,GPIO_PIN_13,GPIO_PIN_RESET);
-//   }
-// }
-// #endif  
-// #if defined(ONE_BOARD) || defined(CHASSIS_BOARD)
-// void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
-// {
-//   if(huart==&huart1)
-//   {
-//     HAL_GPIO_WritePin(GPIOE,GPIO_PIN_9,GPIO_PIN_RESET);
-//   }
-// }
-// #endif  
+
 void RobotTask()
 {
  #if defined(ONE_BOARD) || defined(GIMBAL_BOARD)

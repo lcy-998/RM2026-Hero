@@ -112,16 +112,3 @@ __attribute__((noreturn)) void _DaemonTask(void *argument)
         osDelay(1);
     }
 }
-
-#ifdef CHASSIS_BOARD
-
-__attribute__((noreturn)) void _SuperCapTask(void *argument)
-{
-    for (;;)
-    {
-        SuperCapTask();
-        osDelay(1);
-    }
-}
-
-#endif

@@ -3,8 +3,8 @@
 #include "stdint.h"
 #include "ins_task.h"
 
-//#define CHASSIS_BOARD //底盘板
-#define GIMBAL_BOARD  //云台板
+#define CHASSIS_BOARD //底盘板
+//#define GIMBAL_BOARD  //云台板
 
 #define YAW_K                  0.00025f
 #define PITCH_K                0.00025f
@@ -76,6 +76,7 @@ typedef struct
 
     uint16_t power_buffer;           // 60焦耳缓冲能量
     uint16_t power_limit;            // 底盘功率限制
+    uint8_t is_power_on;           // 电管chassis口供电标志位 1->供电 0->断电
 } Chassis_Ctrl_Cmd_s;
 
 typedef struct
@@ -119,7 +120,7 @@ typedef struct
     float real_wz;
 
     float chassis_real_power; // 底盘实际功率
-    float cap_voltage;        // 超电电压
+    uint8_t cap_energy;        // 超电能量
     uint8_t cap_online_flag; // 超电在线标志位
 
 } Chassis_Upload_Data_s;

@@ -140,28 +140,6 @@ void CANSetDLC(CANInstance *_instance, uint8_t length)
     _instance->txconf.DLC = length;
 }
 
-// float uint_to_float(int x_int, float x_min, float x_max, int bits)
-// {
-//     float span = x_max - x_min;
-//     float offset = x_min;
-//     return ((float)x_int)*span/((float)((1<<bits)-1)) + offset;
-// }
-
-
-// DM4310_t DM4310; // DM4310实例,用于保存电机的状态
-// void DM4310_Decode(uint8_t *data){
-
-//        DM4310.error_state=data[0]>>4;
-//        DM4310.p_int=(data[1]<<8)|data[2];
-//        DM4310.v_int=(data[3]<<4)|(data[4]>>4);
-//        DM4310.t_int=((data[4]&0xF)<<8)|data[5];
-//        DM4310.pos=uint_to_float(DM4310.p_int, -12.5, 12.5, 16);// (-12.5,12.5)
-//        DM4310.vel=uint_to_float(DM4310.v_int, -45.0, 45, 12);// (-45.0,45.0)
-//        DM4310.tor=uint_to_float(DM4310.t_int, -18.0, 18.0, 12);// (-18.0,18.0)
-//        DM4310.MOS_temperature=(float)data[6];
-//        DM4310.temperature=(float)data[7];
-       
-//    }
 /* -----------------------belows are callback definitions--------------------------*/
 
 /**
@@ -179,12 +157,6 @@ static void CANFIFOxCallback(CAN_HandleTypeDef *_hcan, uint32_t fifox)
     {
         HAL_CAN_GetRxMessage(_hcan, fifox, &rxconf, can_rx_buff);
         
-        if (rxconf.StdId == 0x610 || rxconf.StdId == 0x611 ||
-            rxconf.StdId == 0x612 || rxconf.StdId == 0x613)
-        {
-            SuperCapRxCallback(rxconf, can_rx_buff);
-        }
-
         for (size_t i = 0; i < idx; ++i)
         { // 两者相等说明这是要找的实例
             if (_hcan == can_instance[i]->can_handle && rxconf.StdId == can_instance[i]->rx_id)
