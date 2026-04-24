@@ -4,6 +4,7 @@
 #include "super_cap.h"
 #include "message_center.h"
 #include "referee_init.h"
+#include "buzzer.h"
 
 #include "general_def.h"
 #include "bsp_dwt.h"
@@ -23,10 +24,9 @@
 #define LB_CENTER ((HALF_TRACK_WIDTH + CENTER_GIMBAL_OFFSET_X + HALF_WHEEL_BASE + CENTER_GIMBAL_OFFSET_Y) * DEGREE_2_RAD)
 #define RB_CENTER ((HALF_TRACK_WIDTH - CENTER_GIMBAL_OFFSET_X + HALF_WHEEL_BASE + CENTER_GIMBAL_OFFSET_Y) * DEGREE_2_RAD)
 
-#define PUTTER_CALIBRATION_CURRENT_THRESHOLD 6000.0f
+#define PUTTER_CALIBRATION_CURRENT_THRESHOLD 5000.0f
 // 上台阶控制参数需要结合实车方向和负载重新整定
 #define CLIMB_STAIRS_TRACK_WAIT_REF 600.0f
-#define CLIMB_STAIRS_TRACK_STAGE_REF 2600.0f
 #define CLIMB_STAIRS_TRACK_LOAD_FILTER_COEF 0.05f
 #define CLIMB_STAIRS_TRACK_LOAD_THRESHOLD 3200.0f
 #define CLIMB_STAIRS_TRACK_LOAD_CONFIRM_COUNT 20U
@@ -36,9 +36,7 @@
 #define CLIMB_STAIRS_STAGE2_CONFIRM_COUNT 25U
 #define CLIMB_STAIRS_REAR_WHEEL_ASSIST_REF -1200.0f
 #define CLIMB_STAIRS_FRONT_WHEEL_ASSIST_REF -1800.0f
-// 当前按推杆负方向为下压，若实车相反请翻转符号
-#define CLIMB_STAIRS_PUTTER_DOWN_OFFSET -4500.0f
-#define CLIMB_STAIRS_PITCH_BASE_FILTER_COEF 0.01f
+#define PITCH_BASE_FILTER_COEF 0.01f
 
 #ifdef CHASSIS_BOARD
 static attitude_t *chassis_IMU_data;
@@ -47,7 +45,7 @@ static Subscriber_t *chassis_sub;                   // 用于订阅底盘的控�
 static Chassis_Ctrl_Cmd_s chassis_cmd_recv;         // 底盘接收到的控制命令
 static Chassis_Upload_Data_s chassis_feedback_data; // 底盘回传的反馈数据
 static DJIMotorInstance *motor_lf, *motor_rf, *motor_lb, *motor_rb;
-static DJIMotorInstance *putter_motor_l, *putter_motor_r;
+static DJIMotorInstance *putter_motor_l, *putter_motor_r;//右边向上为正
 static DJIMotorInstance *track_wheel_motor_l, *track_wheel_motor_r;
 static PIDInstance *chassis_follow_pid;
 static SuperCapInstance *supercap;
@@ -71,7 +69,7 @@ typedef struct {
     uint16_t stage_count;
 } Climb_Stairs_Ctrl_s;
 
-uint8_t calibration_l_finished = 0, calibration_r_finished = 0;
+uint8_t calibration_l_finished = 0, calibration_r_finished = 0;//0：未标定，1：标定完成，2：标定异常
 static float putter_l_limit_position = 0.0f, putter_r_limit_position = 0.0f;
 static Climb_Stairs_Ctrl_s climb_stairs_ctrl = {.state = CLIMB_STAIRS_WAIT};
 #endif
@@ -172,161 +170,182 @@ static void ClimbStairsApplyAssistRef(float *left_ref, float *right_ref, float a
         *right_ref = assist_ref;
 }
 
+// static void ClimbStairsControl()
+// {
+//     float pitch = 0.0f;
+//     float pitch_delta = 0.0f;
+//     float track_current;
+
+//     if (chassis_IMU_data != NULL)
+//         pitch = chassis_IMU_data->Pitch;
+
+//     track_current = (fabsf(track_wheel_motor_l->measure.real_current) + fabsf(track_wheel_motor_r->measure.real_current)) * 0.5f;
+//     climb_stairs_ctrl.track_current_filtered += (track_current - climb_stairs_ctrl.track_current_filtered) * CLIMB_STAIRS_TRACK_LOAD_FILTER_COEF;
+
+//     if (chassis_cmd_recv.chassis_mode != CHASSIS_FOLLOW_GIMBAL_YAW)
+//     {
+//         ClimbStairsResetState();
+//         DJIMotorSetRef(putter_motor_l, putter_l_limit_position);
+//         DJIMotorSetRef(putter_motor_r, putter_r_limit_position);
+//         DJIMotorStop(track_wheel_motor_l);
+//         DJIMotorStop(track_wheel_motor_r);
+//         return;
+//     }
+
+//     pitch_delta = fabsf(pitch - climb_stairs_ctrl.pitch_reference);
+
+//     switch (climb_stairs_ctrl.state)
+//     {
+//         case CLIMB_STAIRS_WAIT:
+//             climb_stairs_ctrl.pitch_reference += (pitch - climb_stairs_ctrl.pitch_reference) * CLIMB_STAIRS_PITCH_BASE_FILTER_COEF;
+//             ClimbStairsSetTrackWheelRef(CLIMB_STAIRS_TRACK_WAIT_REF);
+//             ClimbStairsSetPutterRef(0.0f);
+
+//             if (climb_stairs_ctrl.track_current_filtered > CLIMB_STAIRS_TRACK_LOAD_THRESHOLD)
+//                 climb_stairs_ctrl.track_load_count++;
+//             else
+//                 climb_stairs_ctrl.track_load_count = 0;
+
+//             if (climb_stairs_ctrl.track_load_count >= CLIMB_STAIRS_TRACK_LOAD_CONFIRM_COUNT)
+//             {
+//                 climb_stairs_ctrl.state            = CLIMB_STAIRS_STAGE_1;
+//                 climb_stairs_ctrl.track_load_count = 0;
+//                 climb_stairs_ctrl.stage_count      = 0;
+//                 climb_stairs_ctrl.pitch_reference  = pitch;
+//             }
+//             break;
+
+//         case CLIMB_STAIRS_STAGE_1:
+//             ClimbStairsSetTrackWheelRef(CLIMB_STAIRS_TRACK_STAGE_REF);
+//             ClimbStairsSetPutterRef(0.0f);
+//             vt_lf = 0.0f;
+//             vt_rf = 0.0f;
+//             ClimbStairsApplyAssistRef(&vt_lb, &vt_rb, CLIMB_STAIRS_REAR_WHEEL_ASSIST_REF);
+
+//             if (pitch_delta > CLIMB_STAIRS_STAGE1_PITCH_THRESHOLD)
+//                 climb_stairs_ctrl.stage_count++;
+//             else
+//                 climb_stairs_ctrl.stage_count = 0;
+
+//             if (climb_stairs_ctrl.stage_count >= CLIMB_STAIRS_STAGE1_CONFIRM_COUNT)
+//             {
+//                 climb_stairs_ctrl.state       = CLIMB_STAIRS_STAGE_2;
+//                 climb_stairs_ctrl.stage_count = 0;
+//             }
+//             break;
+
+//         case CLIMB_STAIRS_STAGE_2:
+//             ClimbStairsSetTrackWheelRef(CLIMB_STAIRS_TRACK_STAGE_REF);
+//             ClimbStairsSetPutterRef(CLIMB_STAIRS_PUTTER_DOWN_OFFSET);
+//             vt_lb = 0.0f;
+//             vt_rb = 0.0f;
+//             ClimbStairsApplyAssistRef(&vt_lf, &vt_rf, CLIMB_STAIRS_FRONT_WHEEL_ASSIST_REF);
+
+//             if (pitch_delta < CLIMB_STAIRS_STAGE2_FINISH_PITCH_THRESHOLD)
+//                 climb_stairs_ctrl.stage_count++;
+//             else
+//                 climb_stairs_ctrl.stage_count = 0;
+
+//             if (climb_stairs_ctrl.stage_count >= CLIMB_STAIRS_STAGE2_CONFIRM_COUNT)
+//             {
+//                 ClimbStairsResetState();
+//                 ClimbStairsSetTrackWheelRef(CLIMB_STAIRS_TRACK_WAIT_REF);
+//                 ClimbStairsSetPutterRef(0.0f);
+//             }
+//             break;
+
+//         default:
+//             ClimbStairsResetState();
+//             break;
+//     }
+// }
+
 static void ClimbStairsControl()
 {
-    float pitch = 0.0f;
-    float pitch_delta = 0.0f;
-    float track_current;
+    DJIMotorSetRef(track_wheel_motor_l, 1000.0f);
+    DJIMotorSetRef(track_wheel_motor_r, 1000.0f);
 
-    if (chassis_IMU_data != NULL)
-        pitch = chassis_IMU_data->Pitch;
-
-    track_current = (fabsf(track_wheel_motor_l->measure.real_current) + fabsf(track_wheel_motor_r->measure.real_current)) * 0.5f;
-    climb_stairs_ctrl.track_current_filtered += (track_current - climb_stairs_ctrl.track_current_filtered) * CLIMB_STAIRS_TRACK_LOAD_FILTER_COEF;
-
-    if (chassis_cmd_recv.chassis_mode != CHASSIS_FOLLOW_GIMBAL_YAW)
-    {
-        ClimbStairsResetState();
-        DJIMotorSetRef(putter_motor_l, putter_l_limit_position);
-        DJIMotorSetRef(putter_motor_r, putter_r_limit_position);
-        DJIMotorStop(track_wheel_motor_l);
-        DJIMotorStop(track_wheel_motor_r);
-        return;
-    }
-
-    pitch_delta = fabsf(pitch - climb_stairs_ctrl.pitch_reference);
-
-    switch (climb_stairs_ctrl.state)
-    {
-        case CLIMB_STAIRS_WAIT:
-            climb_stairs_ctrl.pitch_reference += (pitch - climb_stairs_ctrl.pitch_reference) * CLIMB_STAIRS_PITCH_BASE_FILTER_COEF;
-            ClimbStairsSetTrackWheelRef(CLIMB_STAIRS_TRACK_WAIT_REF);
-            ClimbStairsSetPutterRef(0.0f);
-
-            if (climb_stairs_ctrl.track_current_filtered > CLIMB_STAIRS_TRACK_LOAD_THRESHOLD)
-                climb_stairs_ctrl.track_load_count++;
-            else
-                climb_stairs_ctrl.track_load_count = 0;
-
-            if (climb_stairs_ctrl.track_load_count >= CLIMB_STAIRS_TRACK_LOAD_CONFIRM_COUNT)
-            {
-                climb_stairs_ctrl.state            = CLIMB_STAIRS_STAGE_1;
-                climb_stairs_ctrl.track_load_count = 0;
-                climb_stairs_ctrl.stage_count      = 0;
-                climb_stairs_ctrl.pitch_reference  = pitch;
-            }
-            break;
-
-        case CLIMB_STAIRS_STAGE_1:
-            ClimbStairsSetTrackWheelRef(CLIMB_STAIRS_TRACK_STAGE_REF);
-            ClimbStairsSetPutterRef(0.0f);
-            vt_lf = 0.0f;
-            vt_rf = 0.0f;
-            ClimbStairsApplyAssistRef(&vt_lb, &vt_rb, CLIMB_STAIRS_REAR_WHEEL_ASSIST_REF);
-
-            if (pitch_delta > CLIMB_STAIRS_STAGE1_PITCH_THRESHOLD)
-                climb_stairs_ctrl.stage_count++;
-            else
-                climb_stairs_ctrl.stage_count = 0;
-
-            if (climb_stairs_ctrl.stage_count >= CLIMB_STAIRS_STAGE1_CONFIRM_COUNT)
-            {
-                climb_stairs_ctrl.state       = CLIMB_STAIRS_STAGE_2;
-                climb_stairs_ctrl.stage_count = 0;
-            }
-            break;
-
-        case CLIMB_STAIRS_STAGE_2:
-            ClimbStairsSetTrackWheelRef(CLIMB_STAIRS_TRACK_STAGE_REF);
-            ClimbStairsSetPutterRef(CLIMB_STAIRS_PUTTER_DOWN_OFFSET);
-            vt_lb = 0.0f;
-            vt_rb = 0.0f;
-            ClimbStairsApplyAssistRef(&vt_lf, &vt_rf, CLIMB_STAIRS_FRONT_WHEEL_ASSIST_REF);
-
-            if (pitch_delta < CLIMB_STAIRS_STAGE2_FINISH_PITCH_THRESHOLD)
-                climb_stairs_ctrl.stage_count++;
-            else
-                climb_stairs_ctrl.stage_count = 0;
-
-            if (climb_stairs_ctrl.stage_count >= CLIMB_STAIRS_STAGE2_CONFIRM_COUNT)
-            {
-                ClimbStairsResetState();
-                ClimbStairsSetTrackWheelRef(CLIMB_STAIRS_TRACK_WAIT_REF);
-                ClimbStairsSetPutterRef(0.0f);
-            }
-            break;
-
-        default:
-            ClimbStairsResetState();
-            break;
-    }
+    
 }
+
 
 static void PutterMotorCalibrationLimit()
 {
     DJIMotorEnable(putter_motor_l);
     DJIMotorEnable(putter_motor_r);
 
-    float putter_l_current_sample[10];
-    float putter_r_current_sample[10];
-    float putter_l_position_sample[10];
-    float putter_r_position_sample[10];
-    uint8_t sample_index = 0;
-    uint16_t counter = 0;
-    while (!calibration_l_finished || !calibration_r_finished)
-    {
-        putter_l_current_sample[sample_index] = putter_motor_l->measure.real_current;
-        putter_r_current_sample[sample_index] = putter_motor_r->measure.real_current;
-        putter_l_position_sample[sample_index] = putter_motor_l->measure.total_angle;
-        putter_r_position_sample[sample_index] = putter_motor_r->measure.total_angle;
+    static float putter_l_current_sample[10] = {0};
+    static float putter_r_current_sample[10] = {0};
+    static float putter_l_position_sample[10] = {0};
+    static float putter_r_position_sample[10] = {0};
+    float putter_l_start_position = putter_motor_l->measure.total_angle;
+    float putter_r_start_position = putter_motor_r->measure.total_angle;
+    static uint8_t sample_index = 0;
+    static uint8_t sample_count = 0;
+    static uint16_t counter = 0;
 
-        sample_index = (sample_index + 1) % 10;
+    putter_l_current_sample[sample_index] = putter_motor_l->measure.real_current;
+    putter_r_current_sample[sample_index] = putter_motor_r->measure.real_current;
+    putter_l_position_sample[sample_index] = putter_motor_l->measure.total_angle;
+    putter_r_position_sample[sample_index] = putter_motor_r->measure.total_angle;
 
-        float putter_l_current_avg = 0, putter_r_current_avg = 0, putter_l_position_avg = 0, putter_r_position_avg = 0;
-        for (size_t i = 0; i < 10; ++i) {
-            putter_l_current_avg += putter_l_current_sample[i];
-            putter_r_current_avg += putter_r_current_sample[i];
-            putter_l_position_avg += putter_l_position_sample[i];
-            putter_r_position_avg += putter_r_position_sample[i];
-        }
-        putter_l_current_avg /= 10.0f;
-        putter_r_current_avg /= 10.0f;
-        putter_l_position_avg /= 10.0f;
-        putter_r_position_avg /= 10.0f;
+    sample_index = (sample_index + 1) % 10;
+    float putter_l_current_avg = 0, putter_r_current_avg = 0, putter_l_position_avg = 0, putter_r_position_avg = 0;
 
-        if (putter_l_current_avg > PUTTER_CALIBRATION_CURRENT_THRESHOLD && !calibration_l_finished)
-        {
-            calibration_l_finished = 1;
-            putter_l_limit_position = putter_l_position_avg;
-            DJIMotorSetRef(putter_motor_l, putter_l_limit_position);
-        }
-        else if (!calibration_l_finished)
-        {
-            DJIMotorSetRef(putter_motor_l, counter);
-        }
-
-        if (putter_r_current_avg > PUTTER_CALIBRATION_CURRENT_THRESHOLD && !calibration_r_finished)
-        {
-            calibration_r_finished = 1;
-            putter_r_limit_position = putter_r_position_avg;
-            DJIMotorSetRef(putter_motor_r, putter_r_limit_position);
-        }
-        else if (!calibration_r_finished)
-        {
-            DJIMotorSetRef(putter_motor_r, counter);
-        }
-
-        counter++;
-        if (counter > 10 * 1000) // 5s超时保护
-        {
-            calibration_l_finished = 0;
-            calibration_r_finished = 0;
-            DJIMotorStop(putter_motor_l);
-            DJIMotorStop(putter_motor_r);
-            break;
-        }
-        HAL_Delay(1);
+    for (size_t i = 0; i < 10; ++i) {
+        putter_l_current_avg += putter_l_current_sample[i];
+        putter_r_current_avg += putter_r_current_sample[i];
+        putter_l_position_avg += putter_l_position_sample[i];
+        putter_r_position_avg += putter_r_position_sample[i];
     }
+    putter_l_current_avg /= 10.0f;
+    putter_r_current_avg /= 10.0f;
+    putter_l_position_avg /= 10.0f;
+    putter_r_position_avg /= 10.0f;
+
+    if (fabsf(putter_l_current_avg) > PUTTER_CALIBRATION_CURRENT_THRESHOLD && !calibration_l_finished)
+    {
+        calibration_l_finished = 1;
+        putter_l_limit_position = putter_l_position_avg + 200.0f;
+        DJIMotorSetRef(putter_motor_l, putter_l_limit_position);
+    }
+    else if (!calibration_l_finished)
+    {
+        DJIMotorSetRef(putter_motor_l, putter_l_start_position - counter * 0.1f);
+    }
+
+    if (fabsf(putter_r_current_avg) > PUTTER_CALIBRATION_CURRENT_THRESHOLD && !calibration_r_finished)
+    {
+        calibration_r_finished = 1;
+        putter_r_limit_position = putter_r_position_avg - 200.0f;
+        DJIMotorSetRef(putter_motor_r, putter_r_limit_position);
+    }
+    else if (!calibration_r_finished)
+    {
+        DJIMotorSetRef(putter_motor_r, putter_r_start_position + counter * 0.1f);
+    }
+
+    if (calibration_l_finished && calibration_r_finished)
+    {
+        BuzzerPlay("T240L4 O6cde");
+        return;
+    }
+
+    if (counter % 2000 == 0)
+    {
+        BuzzerPlay("T240L4 O6c");
+    }
+
+    if (counter > 20 * 1000) // 10s超时保护
+    {
+        calibration_l_finished = 2;
+        calibration_r_finished = 2;//2代表标定超时
+        BuzzerPlay("T240L4 O6edc");
+        DJIMotorStop(putter_motor_l);
+        DJIMotorStop(putter_motor_r);
+        return;
+    }
+    counter++;
 }
 
 #endif
@@ -374,23 +393,23 @@ void ChassisInit()
     //推杆电机初始化
     //TODO:调参，测定电流阈值
     Motor_Init_Config_s putter_motor_config = {
-        .can_init_config.can_handle   = &hcan1,
+        .can_init_config.can_handle   = &hcan2,
         .controller_param_init_config = {
             .angle_PID = {
-                .Kp            = 1.0, // 4.5
-                .Ki            = 0,   // 0
-                .Kd            = 0,   // 0
-                .IntegralLimit = 3,
+                .Kp            = 4.5, 
+                .Ki            = 1.5,
+                .Kd            = 0,  
+                .IntegralLimit = 4000,
                 .Improve       = PID_Trapezoid_Intergral | PID_Integral_Limit | PID_Derivative_On_Measurement,
-                .MaxOut        = 5,
+                .MaxOut        = 7000,
             },
             .speed_PID = {
-                .Kp            = 1.0, // 4.5
-                .Ki            = 0,   // 0
+                .Kp            = 2.9, // 4.5
+                .Ki            = 1.2,   // 0
                 .Kd            = 0,   // 0
-                .IntegralLimit = 3000,
+                .IntegralLimit = 10000,
                 .Improve       = PID_Trapezoid_Intergral | PID_Integral_Limit | PID_Derivative_On_Measurement,
-                .MaxOut        = 15000,
+                .MaxOut        = 16380,
             }
         },
         .controller_setting_init_config = {
@@ -401,27 +420,27 @@ void ChassisInit()
         },
         .motor_type = M3508,
     };
-    putter_motor_config.can_init_config.tx_id                             = 5;
-    putter_motor_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_REVERSE;
+    putter_motor_config.can_init_config.tx_id                             = 1;
+    putter_motor_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_NORMAL;
     putter_motor_l = DJIMotorInit(&putter_motor_config);
 
-    putter_motor_config.can_init_config.tx_id                             = 6;
+    putter_motor_config.can_init_config.tx_id                             = 4;
     putter_motor_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_NORMAL;
     putter_motor_r = DJIMotorInit(&putter_motor_config);
 
     //履带轮电机初始化
     //TODO:调参
     Motor_Init_Config_s track_wheel_motor_config = {
-        .can_init_config.can_handle   = &hcan1,
+        .can_init_config.can_handle   = &hcan2,
         .controller_param_init_config = {
             .speed_PID = {
-                .Kp            = 1.0, // 4.5
-                .Ki            = 0,   // 0
+                .Kp            = 2.0, // 4.5
+                .Ki            = 0.7,   // 0
                 .Kd            = 0,   // 0
-                .IntegralLimit = 3000,
+                .IntegralLimit = 6000,
                 .Improve       = PID_Trapezoid_Intergral | PID_Integral_Limit | PID_Derivative_On_Measurement | PID_OutputFilter,
                 .Output_LPF_RC = 0.5,
-                .MaxOut        = 16000,
+                .MaxOut        = 16300,
             }},
         .controller_setting_init_config = {
             .angle_feedback_source = MOTOR_FEED,
@@ -431,12 +450,12 @@ void ChassisInit()
         },
         .motor_type = M3508,
     };
-    track_wheel_motor_config.can_init_config.tx_id                             = 7;
-    track_wheel_motor_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_REVERSE;
+    track_wheel_motor_config.can_init_config.tx_id                             = 3;
+    track_wheel_motor_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_NORMAL;
     track_wheel_motor_l = DJIMotorInit(&track_wheel_motor_config);
 
-    track_wheel_motor_config.can_init_config.tx_id                             = 8;
-    track_wheel_motor_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_NORMAL;
+    track_wheel_motor_config.can_init_config.tx_id                             = 2;
+    track_wheel_motor_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_REVERSE;
     track_wheel_motor_r = DJIMotorInit(&track_wheel_motor_config);
 
     PID_Init_Config_s chassis_follow_pid_config = {
@@ -475,7 +494,9 @@ void ChassisTask()
 {
     #ifdef CHASSIS_BOARD
     SubGetMessage(chassis_sub, &chassis_cmd_recv);
-    if (chassis_cmd_recv.chassis_mode == CHASSIS_ZERO_FORCE){ 
+    if (chassis_cmd_recv.chassis_mode == CHASSIS_ZERO_FORCE || 
+        !calibration_l_finished || !calibration_r_finished)
+    { 
         DJIMotorStop(motor_lf);
         DJIMotorStop(motor_rf);
         DJIMotorStop(motor_lb);
@@ -510,6 +531,8 @@ void ChassisTask()
             cos_theta = arm_cos_f32(chassis_cmd_recv.offset_angle * DEGREE_2_RAD);
             sin_theta = arm_sin_f32(chassis_cmd_recv.offset_angle * DEGREE_2_RAD);
             ramp_init(&rotate_ramp, 250);
+            DJIMotorSetRef(track_wheel_motor_l, 0.0f);
+            DJIMotorSetRef(track_wheel_motor_r, 0.0f);
             break;
         case CHASSIS_FOLLOW_GIMBAL_YAW: 
             if (chassis_cmd_recv.offset_angle <= 90 && chassis_cmd_recv.offset_angle >= -90) // 0附近
@@ -521,12 +544,17 @@ void ChassisTask()
             cos_theta = arm_cos_f32(chassis_cmd_recv.offset_angle * DEGREE_2_RAD);
             sin_theta = arm_sin_f32(chassis_cmd_recv.offset_angle * DEGREE_2_RAD);
 
+            DJIMotorSetRef(track_wheel_motor_l, TRACK_WHEEL_REF);
+            DJIMotorSetRef(track_wheel_motor_r, TRACK_WHEEL_REF);
+
             ramp_init(&rotate_ramp, 250);
             break;
         case CHASSIS_ROTATE: // 自旋,同时保持全向机动;当前wz维持定值,后续增加不规则的变速策略
             chassis_cmd_recv.wz = 5000;
             cos_theta           = arm_cos_f32((chassis_cmd_recv.offset_angle /*+ 22*/) * DEGREE_2_RAD); // 矫正小陀螺偏心
             sin_theta           = arm_sin_f32((chassis_cmd_recv.offset_angle /*+ 22*/) * DEGREE_2_RAD);
+            DJIMotorSetRef(track_wheel_motor_l, 0.0f);
+            DJIMotorSetRef(track_wheel_motor_r, 0.0f);
             break;
             
         case CHASSIS_REVERSE_ROTATE:
@@ -543,10 +571,34 @@ void ChassisTask()
     chassis_vy *= vxy_k;
 
     MecanumCalculate();
-    if (chassis_cmd_recv.chassis_mode != CHASSIS_ZERO_FORCE)
-        ClimbStairsControl();
+
+    // if (chassis_cmd_recv.chassis_mode == CHASSIS_FOLLOW_GIMBAL_YAW)
+    //     ClimbStairsControl();
+    // else 
+    // {
+    //     DJIMotorSetRef(track_wheel_motor_l, 0.0f);
+    //     DJIMotorSetRef(track_wheel_motor_r, 0.0f);
+    //     DJIMotorSetRef(putter_motor_l, putter_l_limit_position);
+    //     DJIMotorSetRef(putter_motor_r, putter_r_limit_position);
+    // }
 
     SuperCapControl();
+
+    if (chassis_cmd_recv.putter_mode == PUTTER_ON)
+    {
+        DJIMotorSetRef(putter_motor_l, putter_l_limit_position + PUTTER_DOWN_OFFSET);
+        DJIMotorSetRef(putter_motor_r, putter_r_limit_position - PUTTER_DOWN_OFFSET);
+    }
+    else
+    {
+        DJIMotorSetRef(putter_motor_l, putter_l_limit_position);
+        DJIMotorSetRef(putter_motor_r, putter_r_limit_position);
+    }
+
+    if (!calibration_l_finished || !calibration_r_finished)
+    {
+        PutterMotorCalibrationLimit();
+    }
 
     float cap_voltage = SuperCapGetChassisVoltage(supercap);
     uint8_t cap_online = SuperCapIsOnline(supercap);

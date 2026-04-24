@@ -45,10 +45,10 @@
 
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN Variables */
-osThreadId_t supercapTaskHandle;
-const osThreadAttr_t supercapTask_attributes = {
-  .name = "supercapTask",
-  .stack_size = 128 * 4,
+osThreadId_t BuzzerHandle;
+const osThreadAttr_t buzzerTask_attributes = {
+  .name = "buzzerTask",
+  .stack_size = 64 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* USER CODE END Variables */
@@ -118,7 +118,7 @@ const osThreadAttr_t Daemon_attributes = {
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
-void _SuperCapTask(void *argument);
+void BuzzerTask(void *argument);
 /* USER CODE END FunctionPrototypes */
 
 void StartDefaultTask(void *argument);
@@ -188,9 +188,7 @@ DaemonHandle = osThreadNew(_DaemonTask, NULL, &Daemon_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
     /* add threads, ... */
-#ifdef CHASSIS_BOARD
-  supercapTaskHandle = osThreadNew(_SuperCapTask, NULL, &supercapTask_attributes);
-#endif
+  BuzzerHandle = osThreadNew(BuzzerTask, NULL, &buzzerTask_attributes);
   /* USER CODE END RTOS_THREADS */
 
   /* USER CODE BEGIN RTOS_EVENTS */

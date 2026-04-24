@@ -25,6 +25,10 @@
 #define INS_PITCH_ADDRESS_OFFSET 0 // 陀螺仪数据相较于云台的pitch的方向
 #define INS_ROLL_ADDRESS_OFFSET  1 // 陀螺仪数据相较于云台的roll的方向
 
+#define PUTTER_DOWN_OFFSET 6500.0f // 推杆下压的目标位置与推杆初始位置的差值,需要根据实车情况调整,当前值为上台阶所需的推杆行程
+#define TRACK_WHEEL_REF 7600.0f    // 上台阶时履带的目标速度
+
+
 typedef enum {
     CHASSIS_ZERO_FORCE = 0,    // 电流零输入
     CHASSIS_ROTATE,            // 小陀螺模式
@@ -60,10 +64,20 @@ typedef enum {
     SUPERCAP_USE
 } SuperCap_Mode_e;
 
-typedef enum{
+typedef enum {
     AUTO_AIM_OFF = 0,
     AUTO_AIM_ON
 } Auto_Aim_Mode_e;
+
+typedef enum {
+    TRACK_WHEEL_OFF = 0,
+    TRACK_WHEEL_ON
+} Track_Wheel_Mode_e;
+
+typedef enum {
+    PUTTER_OFF = 0,
+    PUTTER_ON
+} Putter_Mode_e;
 
 typedef struct
 {
@@ -76,6 +90,9 @@ typedef struct
 
     uint16_t power_buffer;           // 60焦耳缓冲能量
     uint16_t power_limit;            // 底盘功率限制
+
+    Track_Wheel_Mode_e track_wheel_mode;
+    Putter_Mode_e putter_mode;
 } Chassis_Ctrl_Cmd_s;
 
 typedef struct
@@ -162,6 +179,8 @@ typedef struct
     float cmd_wz;
     Chassis_Mode_e chassis_mode;
     SuperCap_Mode_e supercap_flag;
+    Track_Wheel_Mode_e track_wheel_mode;
+    Putter_Mode_e putter_mode;
 
     //云台控制部分
     float yaw_actual_angle;
