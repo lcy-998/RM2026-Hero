@@ -112,5 +112,3 @@ __attribute__((noreturn)) void _DaemonTask(void *argument)
         osDelay(1);
     }
 }
-
-

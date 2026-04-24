@@ -282,15 +282,26 @@ static void RemoteControlSet()
 
         // if (rc_data[TEMP].rc.dial > 250 && rc_data[LAST].rc.dial < 250)
         // {
-        //     if (SuperCap_flag_from_user != SUPERCAP_UNUSE)
+        //     if (gimbal_cmd_send.auto_aim_mode != AUTO_AIM_ON)
         //     {
-        //         SuperCap_flag_from_user = SUPERCAP_UNUSE;
+        //         gimbal_cmd_send.auto_aim_mode = AUTO_AIM_ON;
         //     }
+                
         //     else
-        //     {
-        //         SuperCap_flag_from_user = SUPERCAP_USE;
-        //     }
+        //         gimbal_cmd_send.auto_aim_mode = AUTO_AIM_OFF;
         // }
+
+        if (rc_data[TEMP].rc.dial > 250 && rc_data[LAST].rc.dial < 250)
+        {
+            if (chassis_cmd_send.supercap_flag != SUPERCAP_UNUSE)
+            {
+                chassis_cmd_send.supercap_flag = SUPERCAP_UNUSE;
+            }
+            else
+            {
+                chassis_cmd_send.supercap_flag = SUPERCAP_USE;
+            }
+        }
 
         switch (rc_data[TEMP].rc.switch_left)
         {
@@ -589,14 +600,6 @@ void RobotCMDInit()
         }
     };
     rs485_chassis_board_instance = HostInit(&host_conf);
-
-    SuperCap_Init_Config_s supercap_config = {
-        .can_config = {
-            .can_handle = &hcan1,
-        },
-    };
-    supercap = SuperCapInit(&supercap_config);
-    SuperCapEnable(supercap);
     
 #endif
 
@@ -640,6 +643,7 @@ void RobotCMDTask()
     
     CalcOffsetAngle();
 
+    //chassis_cmd_send
     chassis_cmd_send.vx = chassis_board_recv_data.cmd_vx;
     chassis_cmd_send.vy = chassis_board_recv_data.cmd_vy;
     chassis_cmd_send.wz = chassis_board_recv_data.cmd_wz;
@@ -650,7 +654,9 @@ void RobotCMDTask()
 
     chassis_cmd_send.power_buffer = referee_data->PowerHeatData.chassis_power_buffer;
     chassis_cmd_send.power_limit = referee_data->GameRobotStatus.chassis_power_limit;
+    chassis_cmd_send.is_power_on = referee_data->GameRobotStatus.mains_power_chassis_output;
 
+    //gimbal_cmd_send
     gimbal_cmd_send.yaw_actual_angle = chassis_board_recv_data.yaw_actual_angle;
     gimbal_cmd_send.yaw_actual_speed = chassis_board_recv_data.yaw_actual_speed;
     gimbal_cmd_send.yaw_target_angle = chassis_board_recv_data.yaw_target_angle;
@@ -659,12 +665,13 @@ void RobotCMDTask()
     gimbal_cmd_send.gimbal_mode = chassis_board_recv_data.gimbal_mode;
     gimbal_cmd_send.auto_aim_mode = chassis_board_recv_data.auto_aim_mode;
 
+    //shoot_cmd_send
     shoot_cmd_send.shoot_mode = chassis_board_recv_data.shoot_mode;
     shoot_cmd_send.load_mode = chassis_board_recv_data.load_mode;
     shoot_cmd_send.friction_mode = chassis_board_recv_data.friction_mode;
     shoot_cmd_send.shooter_referee_heat = referee_data->PowerHeatData.shooter_42mm_heat;
 
-
+    //ui_cmd_send
     ui_cmd_send.ui_refresh_flag = chassis_board_recv_data.ui_refresh_flag;
     ui_cmd_send.chassis_mode = chassis_board_recv_data.chassis_mode;
     ui_cmd_send.gimbal_mode = chassis_board_recv_data.gimbal_mode;

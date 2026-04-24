@@ -79,6 +79,25 @@ static Climb_Stairs_Ctrl_s climb_stairs_ctrl = {.state = CLIMB_STAIRS_WAIT};
 #endif
 
 #ifdef CHASSIS_BOARD
+static float GetChassisVwFromPowerLimit(float power_limit)
+{
+    if (power_limit < 70.0f) return 3500.0f;
+    if (power_limit < 75.0f) return 3750.0f;
+    if (power_limit < 80.0f) return 4000.0f;
+    if (power_limit < 85.0f) return 4175.0f;
+    if (power_limit < 90.0f) return 4350.0f;
+    if (power_limit < 95.0f) return 4525.0f;
+    if (power_limit < 100.0f) return 4700.0f;
+    if (power_limit < 105.0f) return 4900.0f;
+    if (power_limit < 110.0f) return 5100.0f;
+    if (power_limit < 120.0f) return 5300.0f;
+    if (power_limit < 130.0f) return 5500.0f;
+    if (power_limit < 140.0f) return 5700.0f;
+    if (power_limit < 160.0f) return 6400.0f;
+    if (power_limit < 250.0f) return 7000.0f;
+    return 3000.0f;
+}
+
 static void MecanumCalculate()
 {
     vt_lf = -chassis_vx - chassis_vy + chassis_cmd_recv.wz * LF_CENTER;
@@ -88,14 +107,14 @@ static void MecanumCalculate()
 }
 
 float Power_Output;
-const float buffer_energy_loop_kp = 0.1f;
-const float cap_voltage_output_loop_kp = 65.0f;//放电时的kp
-const float cap_voltage_input_loop_kp = 10.0f;//充电时的kp
+const float buffer_energy_loop_kp = 2.0f;
+const float cap_voltage_output_loop_kp = 3.0f;//放电时的kp
+const float cap_voltage_input_loop_kp = 1.0f;//充电时的kp
 float buffer_power_rectification, cap_power_rectification;
 
 void SuperCapControl()
  {
-    float buffer_energy_target, buffer_energy_actual, cap_voltage_target, cap_voltage_actual;
+    float buffer_energy_target, buffer_energy_actual, cap_energy_target, cap_energy_actual;
 
     Power_Output = chassis_cmd_recv.power_limit;
 
@@ -106,26 +125,33 @@ void SuperCapControl()
     Power_Output += buffer_power_rectification;
 
     //电容能量环
-    // if (SuperCapIsOnline(supercap))
-    // {
-    //     cap_voltage_actual = SuperCapGetChassisVoltage(supercap);
-    //     if (chassis_cmd_recv.supercap_flag == SUPERCAP_USE)
-    //         cap_voltage_target = SUPERCAP_LOWER_THRESHOLD_VOLTAGE;
-    //     else cap_voltage_target = SUPERCAP_HIGHER_THRESHOLD_VOLTAGE;
+    if (SuperCapIsOnline(supercap))
+    {
+        cap_energy_actual = SuperCapGetCapEnergy(supercap);
+        if (chassis_cmd_recv.supercap_flag == SUPERCAP_USE)
+            cap_energy_target = SUPERCAP_LOWER_THRESHOLD_ENERGY;
+        else cap_energy_target = SUPERCAP_HIGHER_THRESHOLD_ENERGY;
 
-    //     if (cap_voltage_actual > cap_voltage_target)//电压偏大放电
-    //         cap_power_rectification = (cap_voltage_actual - cap_voltage_target) * cap_voltage_output_loop_kp;
-    //     else cap_power_rectification = (cap_voltage_actual - cap_voltage_target) * cap_voltage_input_loop_kp;
-    //     if (cap_power_rectification > 100.0f) cap_power_rectification = 130.0f;
-    //     else if (cap_power_rectification < -50.0f) cap_power_rectification = -50.0f;
-    //     Power_Output += cap_power_rectification;
+        if (cap_energy_actual > cap_energy_target)//电压偏大放电
+            cap_power_rectification = (cap_energy_actual - cap_energy_target) * cap_voltage_output_loop_kp;
+        else cap_power_rectification = (cap_energy_actual - cap_energy_target) * cap_voltage_input_loop_kp;
+        if (cap_power_rectification > 100.0f) cap_power_rectification = 100.0f;
+        else if (cap_power_rectification < -50.0f) cap_power_rectification = -50.0f;
+        Power_Output += cap_power_rectification;
         
-    //     Power_Output -= 10.0f; //超电静态功耗
-    // }
+        Power_Output -= 2.0f; //超电静态功耗
+    }
+
+    //底盘下电时超电失能
+    if (!chassis_cmd_recv.is_power_on)
+        SuperCapDisable(supercap);
+    else SuperCapEnable(supercap);
 
     PowerControlupdate(Power_Output, 1.0f / REDUCTION_RATIO_WHEEL, wattmeter->power);
 
     SuperCapSetPowerLimit(supercap, chassis_cmd_recv.power_limit);
+
+    SuperCapControl();
 
      // 设定速度参考值
      DJIMotorSetRef(motor_lf, vt_lf);
@@ -472,9 +498,11 @@ void ChassisInit()
     SuperCap_Init_Config_s supercap_config = {
         .can_config = {
             .can_handle = &hcan1,
+            .tx_id      = 0x001,
+            .rx_id      = 0x100,
         },
     };
-    supercap = SuperCapInit(&supercap_config);
+    supercap = SuperCapRegister(&supercap_config);
     SuperCapEnable(supercap);
 
     Wattmeter_Init_Config_s wattmeter_config = {
@@ -558,7 +586,7 @@ void ChassisTask()
             break;
             
         case CHASSIS_REVERSE_ROTATE:
-            chassis_cmd_recv.wz = -5000;
+            chassis_cmd_recv.wz = GetChassisVwFromPowerLimit(Power_Output);
             cos_theta           = arm_cos_f32((chassis_cmd_recv.offset_angle /*+ 22*/) * DEGREE_2_RAD); // 矫正小陀螺偏心
             sin_theta           = arm_sin_f32((chassis_cmd_recv.offset_angle /*+ 22*/) * DEGREE_2_RAD);
         default:
@@ -600,10 +628,9 @@ void ChassisTask()
         PutterMotorCalibrationLimit();
     }
 
-    float cap_voltage = SuperCapGetChassisVoltage(supercap);
-    uint8_t cap_online = SuperCapIsOnline(supercap);
-
-    chassis_feedback_data.cap_online_flag = cap_online;
+    chassis_feedback_data.chassis_real_power = SuperCapGetChassisRealPower(supercap);
+    chassis_feedback_data.cap_energy = SuperCapGetCapEnergy(supercap);
+    chassis_feedback_data.cap_online_flag = SuperCapIsOnline(supercap);
     PubPushMessage(chassis_pub, (void *)&chassis_feedback_data);
     #endif
 }
