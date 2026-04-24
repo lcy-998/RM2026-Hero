@@ -85,6 +85,10 @@ static void ChassisBoardSend() // C->G
 {
     chassis_board_send_data.header = 0xA5;
 
+    //底盘反馈
+    chassis_board_send_data.putter_offset = chassis_fetch_data.putter_offset;
+
+    //裁判系统反馈
     chassis_board_send_data.bullet_speed = referee_data->ShootData.bullet_speed;
     chassis_board_send_data.enermy_color = referee_data->referee_id.Robot_Color;
 
@@ -146,8 +150,7 @@ static void GimbalBoardSend()
     gimbal_board_send_data.cmd_wz = chassis_cmd_send.wz;
     gimbal_board_send_data.chassis_mode = chassis_cmd_send.chassis_mode;
     gimbal_board_send_data.supercap_flag = chassis_cmd_send.supercap_flag;
-    gimbal_board_send_data.track_wheel_mode = chassis_cmd_send.track_wheel_mode;
-    gimbal_board_send_data.putter_mode = chassis_cmd_send.putter_mode;
+    gimbal_board_send_data.putter_offset = chassis_cmd_send.putter_offset;
 
     //云台控制
 
@@ -259,25 +262,20 @@ static void RemoteControlSet()
 
     if (rc_data[TEMP].rc_update_flag == 1)
     {
-        // if (rc_data[TEMP].rc.dial > 250 && rc_data[LAST].rc.dial < 250)
-        // {
-        //     if (gimbal_cmd_send.auto_aim_mode != AUTO_AIM_ON)
-        //     {
-        //         gimbal_cmd_send.auto_aim_mode = AUTO_AIM_ON;
-        //     }
-                
-        //     else
-        //         gimbal_cmd_send.auto_aim_mode = AUTO_AIM_OFF;
-        // }
-
         if (rc_data[TEMP].rc.dial > 250 && rc_data[LAST].rc.dial < 250)
         {
-            if (chassis_cmd_send.putter_mode != PUTTER_ON)
+            if (chassis_fetch_data.putter_offset < (PUTTER_DOWN_OFFSET / 2.0f))
             {
-                chassis_cmd_send.putter_mode = PUTTER_ON;
+                chassis_cmd_send.putter_offset = PUTTER_DOWN_OFFSET;
             }
             else
-                chassis_cmd_send.putter_mode = PUTTER_OFF;
+            {
+                chassis_cmd_send.putter_offset = -PUTTER_DOWN_OFFSET;
+            }
+        }
+        else
+        {
+            chassis_cmd_send.putter_offset = 0.0f;
         }
 
         // if (rc_data[TEMP].rc.dial > 250 && rc_data[LAST].rc.dial < 250)
@@ -291,17 +289,17 @@ static void RemoteControlSet()
         //         gimbal_cmd_send.auto_aim_mode = AUTO_AIM_OFF;
         // }
 
-        if (rc_data[TEMP].rc.dial > 250 && rc_data[LAST].rc.dial < 250)
-        {
-            if (chassis_cmd_send.supercap_flag != SUPERCAP_UNUSE)
-            {
-                chassis_cmd_send.supercap_flag = SUPERCAP_UNUSE;
-            }
-            else
-            {
-                chassis_cmd_send.supercap_flag = SUPERCAP_USE;
-            }
-        }
+        // if (rc_data[TEMP].rc.dial > 250 && rc_data[LAST].rc.dial < 250)
+        // {
+        //     if (chassis_cmd_send.supercap_flag != SUPERCAP_UNUSE)
+        //     {
+        //         chassis_cmd_send.supercap_flag = SUPERCAP_UNUSE;
+        //     }
+        //     else
+        //     {
+        //         chassis_cmd_send.supercap_flag = SUPERCAP_USE;
+        //     }
+        // }
 
         switch (rc_data[TEMP].rc.switch_left)
         {
@@ -433,6 +431,17 @@ static void ChassisSet()
         ramp_init(&lr_ramp, RAMP_TIME);
     }
 
+    if (rc_data[TEMP].key[KEY_PRESS].f)
+    {
+        if (chassis_fetch_data.putter_offset < PUTTER_DOWN_OFFSET / 2.0f)
+        {
+            chassis_cmd_send.putter_offset = PUTTER_DOWN_OFFSET;
+        }
+        else
+        {
+            chassis_cmd_send.putter_offset = -PUTTER_DOWN_OFFSET;
+        }
+    }
     current_speed_x = chassis_cmd_send.vx;
     current_speed_y = chassis_cmd_send.vy;
 }
@@ -541,15 +550,6 @@ static void KeyGetMode()
             chassis_cmd_send.supercap_flag = SUPERCAP_UNUSE;
             break;
     }
-
-    switch (rc_data[TEMP].key_count[KEY_PRESS][Key_F] % 2) {
-        case 1:
-            chassis_cmd_send.putter_mode = PUTTER_ON;
-            break;
-        case 0:
-            chassis_cmd_send.putter_mode = PUTTER_OFF;
-            break;
-    }
 }
 
 static void MouseKeySet()
@@ -569,8 +569,6 @@ static void EmergencyHandler()
     shoot_cmd_send.load_mode      = LOAD_STOP;
     shoot_cmd_send.shoot_mode     = SHOOT_OFF;
     chassis_cmd_send.supercap_flag = SUPERCAP_UNUSE;
-    chassis_cmd_send.track_wheel_mode = TRACK_WHEEL_OFF;
-    chassis_cmd_send.putter_mode = PUTTER_OFF;
     LOGERROR("[CMD] emergency stop!");
 }
 
@@ -649,8 +647,7 @@ void RobotCMDTask()
     chassis_cmd_send.wz = chassis_board_recv_data.cmd_wz;
     chassis_cmd_send.chassis_mode = chassis_board_recv_data.chassis_mode;
     chassis_cmd_send.supercap_flag = chassis_board_recv_data.supercap_flag;
-    chassis_cmd_send.track_wheel_mode = chassis_board_recv_data.track_wheel_mode;
-    chassis_cmd_send.putter_mode = chassis_board_recv_data.putter_mode;
+    chassis_cmd_send.putter_offset = chassis_board_recv_data.putter_offset;
 
     chassis_cmd_send.power_buffer = referee_data->PowerHeatData.chassis_power_buffer;
     chassis_cmd_send.power_limit = referee_data->GameRobotStatus.chassis_power_limit;
@@ -688,6 +685,7 @@ void RobotCMDTask()
 #endif
 
 #ifdef GIMBAL_BOARD
+    chassis_fetch_data.putter_offset = gimbal_board_recv_data.putter_offset;
 
     if (switch_is_up(rc_data[TEMP].rc.switch_left) && (switch_is_down(rc_data[TEMP].rc.switch_right))) // 遥控器拨杆右[上]左[下],键鼠控制
         MouseKeySet();

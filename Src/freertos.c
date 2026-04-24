@@ -170,10 +170,8 @@ void MX_FREERTOS_Init(void) {
   /* creation of Gimbal */
 
  GimbalHandle = osThreadNew(_GimbalTask, NULL, &Gimbal_attributes);
- #if defined(ONE_BOARD) || defined(GIMBAL_BOARD)
   /* creation of instask */
-    instaskHandle = osThreadNew(StartINSTASK, NULL, &instask_attributes);
-#endif
+  instaskHandle = osThreadNew(StartINSTASK, NULL, &instask_attributes);
 DaemonHandle = osThreadNew(_DaemonTask, NULL, &Daemon_attributes);
 #if defined(ONE_BOARD) || defined(CHASSIS_BOARD)
   /* creation of Chassis */

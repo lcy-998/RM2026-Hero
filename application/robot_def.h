@@ -5,8 +5,6 @@
 
 #define CHASSIS_BOARD //底盘板
 //#define GIMBAL_BOARD  //云台板
-#define CHASSIS_BOARD //底盘板
-//#define GIMBAL_BOARD  //云台板
 
 #define YAW_K                  0.00025f
 #define PITCH_K                0.00025f
@@ -27,8 +25,9 @@
 #define INS_PITCH_ADDRESS_OFFSET 0 // 陀螺仪数据相较于云台的pitch的方向
 #define INS_ROLL_ADDRESS_OFFSET  1 // 陀螺仪数据相较于云台的roll的方向
 
-#define PUTTER_DOWN_OFFSET 6500.0f // 推杆下压的目标位置与推杆初始位置的差值,需要根据实车情况调整,当前值为上台阶所需的推杆行程
+#define PUTTER_DOWN_OFFSET 6100.0f // 推杆下压的目标位置与推杆初始位置的差值,需要根据实车情况调整,当前值为上台阶所需的推杆行程
 #define TRACK_WHEEL_REF 7600.0f    // 上台阶时履带的目标速度
+
 
 
 typedef enum {
@@ -94,7 +93,7 @@ typedef struct
     uint16_t power_limit;            // 底盘功率限制
 
     Track_Wheel_Mode_e track_wheel_mode;
-    Putter_Mode_e putter_mode;
+    float putter_offset;
     uint8_t is_power_on;           // 电管chassis口供电标志位 1->供电 0->断电
 } Chassis_Ctrl_Cmd_s;
 
@@ -142,6 +141,8 @@ typedef struct
     uint8_t cap_energy;        // 超电能量
     uint8_t cap_online_flag; // 超电在线标志位
 
+    float putter_offset; //推杆推出长度
+
 } Chassis_Upload_Data_s;
 
 typedef struct
@@ -166,6 +167,9 @@ typedef struct
 typedef struct
 {
     uint8_t header; // 数据包头
+    //底盘反馈
+    float putter_offset; //推杆位置
+
     //裁判系统反馈
     float bullet_speed;
     uint8_t enermy_color;
@@ -182,8 +186,7 @@ typedef struct
     float cmd_wz;
     Chassis_Mode_e chassis_mode;
     SuperCap_Mode_e supercap_flag;
-    Track_Wheel_Mode_e track_wheel_mode;
-    Putter_Mode_e putter_mode;
+    float putter_offset;
 
     //云台控制部分
     float yaw_actual_angle;

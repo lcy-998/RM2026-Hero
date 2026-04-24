@@ -58,7 +58,7 @@ SuperCapInstance *SuperCapRegister(SuperCap_Init_Config_s *config)
     return supercap;
 }
 
-void SuperCapControl(void)
+void SuperCapTask(void)
 {
     static uint8_t counter = 0;
     if (counter % 8 == 0) // 200ms周期发送一次控制命令,上位机控制频率较低
