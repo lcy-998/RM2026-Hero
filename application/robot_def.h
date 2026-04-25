@@ -27,6 +27,8 @@
 
 #define PUTTER_DOWN_OFFSET 6100.0f // 推杆下压的目标位置与推杆初始位置的差值,需要根据实车情况调整,当前值为上台阶所需的推杆行程
 #define TRACK_WHEEL_REF 7600.0f    // 上台阶时履带的目标速度
+#define TRACK_WHEEL_RADIUS 0.038f       // 履带轮的半径,用于计算履带线速度与角速度的关系
+#define TRACK_WHEEL_TO_CENTER 0.3f // 履带到中心的距离
 
 
 

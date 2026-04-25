@@ -30,7 +30,7 @@
 // #define CLIMB_STAIRS_TRACK_LOAD_FILTER_COEF 0.05f
 // #define CLIMB_STAIRS_TRACK_LOAD_THRESHOLD 3200.0f
 // #define CLIMB_STAIRS_TRACK_LOAD_CONFIRM_COUNT 20U
-#define CLIMB_STAIRS_STAGE1_PITCH_THRESHOLD 25.0f
+#define CLIMB_STAIRS_STAGE1_PITCH_THRESHOLD 21.0f
 #define CLIMB_STAIRS_STAGE1_CONFIRM_COUNT 250U
 #define CLIMB_STAIRS_STAGE2_FINISH_PITCH_THRESHOLD 4.0f
 #define CLIMB_STAIRS_STAGE2_CONFIRM_COUNT 250U
@@ -512,8 +512,11 @@ void ChassisTask()
             chassis_cmd_recv.wz = PIDCalculate(chassis_follow_pid, offset_angle, 0);
             cos_theta = arm_cos_f32(chassis_cmd_recv.offset_angle * DEGREE_2_RAD);
             sin_theta = arm_sin_f32(chassis_cmd_recv.offset_angle * DEGREE_2_RAD);
-            DJIMotorSetRef(track_wheel_motor_l, TRACK_WHEEL_REF);
-            DJIMotorSetRef(track_wheel_motor_r, TRACK_WHEEL_REF);
+            
+            float target_track_wheel_ref_l = float_constrain(chassis_cmd_recv.vx * cos_theta - chassis_cmd_recv.vy * sin_theta, -TRACK_WHEEL_REF, TRACK_WHEEL_REF) - chassis_cmd_recv.wz * TRACK_WHEEL_TO_CENTER / TRACK_WHEEL_RADIUS;
+            float target_track_wheel_ref_r = float_constrain(chassis_cmd_recv.vx * cos_theta + chassis_cmd_recv.vy * sin_theta, -TRACK_WHEEL_REF, TRACK_WHEEL_REF) + chassis_cmd_recv.wz * TRACK_WHEEL_TO_CENTER / TRACK_WHEEL_RADIUS;
+            DJIMotorSetRef(track_wheel_motor_l, target_track_wheel_ref_l);
+            DJIMotorSetRef(track_wheel_motor_r, target_track_wheel_ref_r);
             putter_target_pos += chassis_cmd_recv.putter_offset;
             ramp_init(&rotate_ramp, 250);
             break;
