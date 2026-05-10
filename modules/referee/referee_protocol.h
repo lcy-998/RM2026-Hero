@@ -87,9 +87,11 @@ typedef enum {
     ID_Radar_Info                = 0x020E,
     ID_student_interactive       = 0x0301,// 机器人间交互数据
     ID_Map_Command               = 0x0303,
+    ID_Image_Road_Cmd            = 0x0304, 
     ID_Map_Robot_Data            = 0x0305,
     ID_Map_Data                  = 0x0307,
-    ID_Custom_Info               = 0x0308
+    ID_Custom_Send_Info          = 0x0310,// 发送给自定义客户端
+    ID_Custom_Recv_Info          = 0x0311,// 从自定义客户端接收
 } CmdID_e;
 
 /* 命令码数据段长,根据官方协议来定义长度，还有自定义数据长度 */
@@ -114,13 +116,12 @@ typedef enum {
     LEN_sentry_info              = 6,                       // 0x020D
     LEN_radar_info               = 1,                       // 0x020E
     LEN_receive_data             = 6 + Communicate_Data_LEN,// 0x0301
-    LEN_map_command              =15,                       // 0x0303
-    LEN_map_robot_data           =24,                       // 0x0305
-    LEN_map_data                 =103,                      // 0x0307
-    LEN_custom_info              =34,                       // 0x0308
-    
-
-
+    LEN_map_command              = 15,                      // 0x0303
+    LEN_image_road_cmd           = 12,                      // 0x0304
+    LEN_map_robot_data           = 24,                      // 0x0305
+    LEN_map_data                 = 103,                     // 0x0307
+    LEN_custom_send_info         = 300,                     // 0x0310
+    LEN_custom_recv_info         = 30,                      // 0x0311
 } JudgeDataLength_e;
 
 /****************************接收数据的详细说明****************************/
@@ -316,6 +317,17 @@ uint8_t target_robot_id;
 uint16_t cmd_source; 
 }ext_map_command_t; 
 
+typedef struct 
+{ 
+    int16_t mouse_x; 
+    int16_t mouse_y; 
+    int16_t mouse_z; 
+    int8_t left_button_down; 
+    int8_t right_button_down; 
+    uint16_t keyboard_value; 
+    uint16_t reserved; 
+}ext_image_road_cmd_t; 
+
 /* ID: 0x0305 Byte : 24   选手端小地图接收雷达数据 */
 typedef struct 
 {  
@@ -336,20 +348,18 @@ uint16_t hero_position_x;
 /* ID: 0x0307 Byte : 103   选手端小地图接收哨兵数据 */
 typedef struct 
 { 
-uint8_t intention; 
-uint16_t start_position_x; 
-uint16_t start_position_y; 
-int8_t delta_x[49]; 
-int8_t delta_y[49]; 
-uint16_t sender_id; 
+    uint8_t intention; 
+    uint16_t start_position_x; 
+    uint16_t start_position_y; 
+    int8_t delta_x[49]; 
+    int8_t delta_y[49]; 
+    uint16_t sender_id; 
 }ext_map_data_t; 
 
-/* ID: 0x0308 Byte : 34   选手端小地图接收机器人数据 */
+/* ID: 0x0311 Byte : 30    从自定义客户端接收的数据 */
 typedef struct 
-{  
-uint16_t sender_id; 
-uint16_t receiver_id; 
-uint8_t user_data[30]; 
+{
+    uint8_t user_data[30]; 
 } ext_custom_info_t; 
 
 

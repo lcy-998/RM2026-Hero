@@ -69,7 +69,7 @@ static void JudgeReadData(uint8_t *buff)
                         memcpy(&referee_info.RefereeWarning, (buff + DATA_Offset), LEN_referee_warning_t);
                         break;
                     case ID_Dart_Info:  //0x0105
-                        memcpy(&referee_info.RefereeWarning, (buff + DATA_Offset), LEN_dart_info_t);
+                        memcpy(&referee_info.DartInfo, (buff + DATA_Offset), LEN_dart_info_t);
                         break;
                     case ID_game_robot_state: // 0x0201
                         memcpy(&referee_info.GameRobotStatus, (buff + DATA_Offset), LEN_game_robot_state);
@@ -116,14 +116,17 @@ static void JudgeReadData(uint8_t *buff)
                     case ID_Map_Command: // 0x0303
                         memcpy(&referee_info.MapCommand, (buff + DATA_Offset), LEN_map_command);
                         break;
+                    case ID_Image_Road_Cmd: // 0x0304
+                        memcpy(&referee_info.ImageRoadCmd, (buff + DATA_Offset), LEN_image_road_cmd);
+                        break;
                     case ID_Map_Robot_Data: // 0x0305
                         memcpy(&referee_info.MapRobotData, (buff + DATA_Offset), LEN_map_robot_data);
                         break;
                     case ID_Map_Data: // 0x0307
                         memcpy(&referee_info.MapData, (buff + DATA_Offset), LEN_map_data);
                         break;
-                    case ID_Custom_Info: // 0x0309
-                        memcpy(&referee_info.CustomInfo, (buff + DATA_Offset), LEN_custom_info);
+                    case ID_Custom_Recv_Info: // 0x0311
+                        memcpy(&referee_info.CustomInfo, (buff + DATA_Offset), LEN_custom_recv_info);
                         break;
                 }
             } else {

@@ -81,27 +81,42 @@ static void ChassisBoardRecvOfflineCallback(void *instance)
     gimbal_board_offline_flag = 1;
 }
 
+
 static void ChassisBoardSend() // C->G
 {
-    chassis_board_send_data.header = 0xA5;
+    static uint8_t send_count = 0;
 
-    //底盘反馈
-    chassis_board_send_data.putter_offset = chassis_fetch_data.putter_offset;
+    if (send_count % 20 == 0) {
+        chassis_board_send_data.header = FREQ_50Hz_HEADER;
+        //底盘反馈
+        chassis_board_send_data.Freq_50Hz.chassis_real_power = chassis_fetch_data.chassis_real_power;
+        chassis_board_send_data.Freq_50Hz.cap_energy = chassis_fetch_data.cap_energy;
+        chassis_board_send_data.Freq_50Hz.putter_offset = (chassis_fetch_data.putter_offset > 0.5f * PUTTER_DOWN_OFFSET) ? PUTTER_DOWN : PUTTER_UP;
 
-    //裁判系统反馈
-    chassis_board_send_data.bullet_speed = referee_data->ShootData.bullet_speed;
-    chassis_board_send_data.enermy_color = referee_data->referee_id.Robot_Color;
+        //裁判系统反馈
+        chassis_board_send_data.Freq_50Hz.bullet_speed = referee_data->ShootData.bullet_speed;
+        chassis_board_send_data.Freq_50Hz.enermy_color = referee_data->referee_id.Robot_Color;
 
-    chassis_board_send_data.tail = 0x5A;
-
-    HostSend(rs485_chassis_board_instance, &chassis_board_send_data, sizeof(chassis_board_send_data));
+        HostSend(rs485_chassis_board_instance, &chassis_board_send_data, sizeof(chassis_board_send_data.Freq_50Hz) + sizeof(chassis_board_send_data.Freq_1000Hz) + 1);
+    }
+    send_count++;
+    if (send_count >= 1000)
+        send_count = 0;
 }
 
 static void ChassisBoardRecvCallback() // G->C
 {
     DaemonReload(rs485_chassis_board_instance->daemon);
     gimbal_board_offline_flag = 0;
-    memcpy(&chassis_board_recv_data, rs485_chassis_board_instance->comm_instance, sizeof(chassis_board_recv_data));
+
+    if (((uint8_t *)(rs485_chassis_board_instance->comm_instance))[0] == FREQ_1000Hz_HEADER)
+    {
+        memcpy(&chassis_board_recv_data, rs485_chassis_board_instance->comm_instance, sizeof(chassis_board_recv_data.Freq_1000Hz) + 1);
+    }
+    else if (((uint8_t *)(rs485_chassis_board_instance->comm_instance))[0] == FREQ_50Hz_HEADER)
+    {
+        memcpy(&chassis_board_recv_data, rs485_chassis_board_instance->comm_instance, sizeof(chassis_board_recv_data.Freq_50Hz) + sizeof(chassis_board_recv_data.Freq_1000Hz) + 1);
+    }
 
     ChassisBoardSend();
 }
@@ -138,39 +153,61 @@ static void GimbalBoardRecvCallback()
 {
     DaemonReload(rs485_gimbal_board_instance->daemon);
     communication_flag.chassis_board_offline_flag = 0;
-    memcpy(&gimbal_board_recv_data, rs485_gimbal_board_instance->comm_instance, sizeof(gimbal_board_recv_data));
+
+    if (((uint8_t *)(rs485_gimbal_board_instance->comm_instance))[0] == FREQ_1000Hz_HEADER)
+    {
+        memcpy(&gimbal_board_recv_data, rs485_gimbal_board_instance->comm_instance, sizeof(gimbal_board_recv_data.Freq_1000Hz) + 1);
+    }
+    else if (((uint8_t *)(rs485_gimbal_board_instance->comm_instance))[0] == FREQ_50Hz_HEADER)
+    {
+        memcpy(&gimbal_board_recv_data, rs485_gimbal_board_instance->comm_instance, sizeof(gimbal_board_recv_data.Freq_1000Hz) + sizeof(gimbal_board_recv_data.Freq_50Hz));
+    }
 }
 
 static void GimbalBoardSend()
 {
-    gimbal_board_send_data.header = 0xA5;
+    static uint8_t send_count = 0;
+    
+    gimbal_board_send_data.header = FREQ_1000Hz_HEADER;
     //底盘控制
-    gimbal_board_send_data.cmd_vx = chassis_cmd_send.vx;
-    gimbal_board_send_data.cmd_vy = chassis_cmd_send.vy;
-    gimbal_board_send_data.cmd_wz = chassis_cmd_send.wz;
-    gimbal_board_send_data.chassis_mode = chassis_cmd_send.chassis_mode;
-    gimbal_board_send_data.supercap_flag = chassis_cmd_send.supercap_flag;
-    gimbal_board_send_data.putter_offset = chassis_cmd_send.putter_offset;
+    gimbal_board_send_data.Freq_1000Hz.cmd_vx = chassis_cmd_send.vx;
+    gimbal_board_send_data.Freq_1000Hz.cmd_vy = chassis_cmd_send.vy;
+    gimbal_board_send_data.Freq_1000Hz.cmd_wz = chassis_cmd_send.wz;
 
     //云台控制
+    gimbal_board_send_data.Freq_1000Hz.yaw_actual_angle = gimbal_fetch_data.gimbal_imu_data->Yaw;
+    gimbal_board_send_data.Freq_1000Hz.yaw_actual_speed = gimbal_fetch_data.gimbal_imu_data->Gyro[INS_YAW_ADDRESS_OFFSET];
+    gimbal_board_send_data.Freq_1000Hz.yaw_target_angle = gimbal_cmd_send.yaw_target_angle;
+    gimbal_board_send_data.Freq_1000Hz.yaw_target_speed = gimbal_cmd_send.yaw_target_speed;
 
-    gimbal_board_send_data.yaw_actual_angle = gimbal_fetch_data.gimbal_imu_data->Yaw;
-    gimbal_board_send_data.yaw_actual_speed = gimbal_fetch_data.gimbal_imu_data->Gyro[INS_YAW_ADDRESS_OFFSET];
-    gimbal_board_send_data.yaw_target_angle = gimbal_cmd_send.yaw_target_angle;
-    gimbal_board_send_data.yaw_target_speed = gimbal_cmd_send.yaw_target_speed;
-    gimbal_board_send_data.gimbal_mode = gimbal_cmd_send.gimbal_mode;
-    gimbal_board_send_data.auto_aim_mode = gimbal_cmd_send.auto_aim_mode;
+    if (send_count % 20 == 0)
+    {
+        gimbal_board_send_data.header = FREQ_50Hz_HEADER;
+        //底盘控制
+        gimbal_board_send_data.Freq_50Hz.chassis_mode = chassis_cmd_send.chassis_mode;
+        gimbal_board_send_data.Freq_50Hz.supercap_flag = chassis_cmd_send.supercap_flag;
+        gimbal_board_send_data.Freq_50Hz.putter_offset = chassis_cmd_send.putter_offset;
 
-    //发射控制
-    gimbal_board_send_data.shoot_mode = shoot_cmd_send.shoot_mode;
-    gimbal_board_send_data.load_mode = shoot_cmd_send.load_mode;
-    gimbal_board_send_data.friction_mode = shoot_cmd_send.friction_mode;
+        //云台控制
+        gimbal_board_send_data.Freq_50Hz.gimbal_mode = gimbal_cmd_send.gimbal_mode;
+        gimbal_board_send_data.Freq_50Hz.auto_aim_mode = gimbal_cmd_send.auto_aim_mode;
 
-    gimbal_board_send_data.ui_refresh_flag = ui_cmd_send.ui_refresh_flag;
+        //发射控制
+        gimbal_board_send_data.Freq_50Hz.shoot_mode = shoot_cmd_send.shoot_mode;
+        gimbal_board_send_data.Freq_50Hz.load_mode = shoot_cmd_send.load_mode;
+        gimbal_board_send_data.Freq_50Hz.friction_mode = shoot_cmd_send.friction_mode;
 
-    gimbal_board_send_data.tail = 0x5A;
+        gimbal_board_send_data.Freq_50Hz.ui_refresh_flag = ui_cmd_send.ui_refresh_flag;
+        HostSend(rs485_gimbal_board_instance, &gimbal_board_send_data, sizeof(gimbal_board_send_data.Freq_50Hz) + sizeof(gimbal_board_send_data.Freq_1000Hz) + 1);
+    }
+    else
+    {
+        HostSend(rs485_gimbal_board_instance, &gimbal_board_send_data, sizeof(gimbal_board_send_data.Freq_1000Hz) + 1);
+    }
 
-    HostSend(rs485_gimbal_board_instance, &gimbal_board_send_data, sizeof(gimbal_board_send_data));
+    send_count++;
+    if (send_count >= 1000)
+        send_count = 0;
 }
 
 static void VisionOfflineCallback(void *instance)
@@ -214,7 +251,7 @@ static void VisionSendMessage()
     vision_send_packet.yaw = gimbal_fetch_data.gimbal_imu_data->Yaw * DEGREE_2_RAD;
     vision_send_packet.yaw_vel = gimbal_fetch_data.gimbal_imu_data->Gyro[INS_YAW_ADDRESS_OFFSET];
 
-    vision_send_packet.bullet_speed = gimbal_board_recv_data.bullet_speed;
+    vision_send_packet.bullet_speed = gimbal_board_recv_data.Freq_50Hz.bullet_speed;
     vision_send_packet.tail = 0xff;
     
     HostSend(usb_vision_instance, &vision_send_packet, sizeof(vision_send_packet));
@@ -262,21 +299,21 @@ static void RemoteControlSet()
 
     if (rc_data[TEMP].rc_update_flag == 1)
     {
-        if (rc_data[TEMP].rc.dial > 250 && rc_data[LAST].rc.dial < 250)
-        {
-            if (chassis_fetch_data.putter_offset < (PUTTER_DOWN_OFFSET / 2.0f))
-            {
-                chassis_cmd_send.putter_offset = PUTTER_DOWN_OFFSET;
-            }
-            else
-            {
-                chassis_cmd_send.putter_offset = -PUTTER_DOWN_OFFSET;
-            }
-        }
-        else
-        {
-            chassis_cmd_send.putter_offset = 0.0f;
-        }
+        // if (rc_data[TEMP].rc.dial > 250 && rc_data[LAST].rc.dial < 250)
+        // {
+        //     if (gimbal_board_recv_data.putter_offset)
+        //     {
+        //         chassis_cmd_send.putter_offset = -PUTTER_DOWN_OFFSET;
+        //     }
+        //     else
+        //     {
+        //         chassis_cmd_send.putter_offset = PUTTER_DOWN_OFFSET;
+        //     }
+        // }
+        // else
+        // {
+        //     chassis_cmd_send.putter_offset = 0.0f;
+        // }
 
         // if (rc_data[TEMP].rc.dial > 250 && rc_data[LAST].rc.dial < 250)
         // {
@@ -289,17 +326,17 @@ static void RemoteControlSet()
         //         gimbal_cmd_send.auto_aim_mode = AUTO_AIM_OFF;
         // }
 
-        // if (rc_data[TEMP].rc.dial > 250 && rc_data[LAST].rc.dial < 250)
-        // {
-        //     if (chassis_cmd_send.supercap_flag != SUPERCAP_UNUSE)
-        //     {
-        //         chassis_cmd_send.supercap_flag = SUPERCAP_UNUSE;
-        //     }
-        //     else
-        //     {
-        //         chassis_cmd_send.supercap_flag = SUPERCAP_USE;
-        //     }
-        // }
+        if (rc_data[TEMP].rc.dial > 250 && rc_data[LAST].rc.dial < 250)
+        {
+            if (chassis_cmd_send.supercap_flag != SUPERCAP_UNUSE)
+            {
+                chassis_cmd_send.supercap_flag = SUPERCAP_UNUSE;
+            }
+            else
+            {
+                chassis_cmd_send.supercap_flag = SUPERCAP_USE;
+            }
+        }
 
         switch (rc_data[TEMP].rc.switch_left)
         {
@@ -642,37 +679,37 @@ void RobotCMDTask()
     CalcOffsetAngle();
 
     //chassis_cmd_send
-    chassis_cmd_send.vx = chassis_board_recv_data.cmd_vx;
-    chassis_cmd_send.vy = chassis_board_recv_data.cmd_vy;
-    chassis_cmd_send.wz = chassis_board_recv_data.cmd_wz;
-    chassis_cmd_send.chassis_mode = chassis_board_recv_data.chassis_mode;
-    chassis_cmd_send.supercap_flag = chassis_board_recv_data.supercap_flag;
-    chassis_cmd_send.putter_offset = chassis_board_recv_data.putter_offset;
+    chassis_cmd_send.vx = chassis_board_recv_data.Freq_1000Hz.cmd_vx;
+    chassis_cmd_send.vy = chassis_board_recv_data.Freq_1000Hz.cmd_vy;
+    chassis_cmd_send.wz = chassis_board_recv_data.Freq_1000Hz.cmd_wz;
+    chassis_cmd_send.chassis_mode = chassis_board_recv_data.Freq_50Hz.chassis_mode;
+    chassis_cmd_send.supercap_flag = chassis_board_recv_data.Freq_50Hz.supercap_flag;
+    chassis_cmd_send.putter_offset = chassis_board_recv_data.Freq_50Hz.putter_offset;
 
     chassis_cmd_send.power_buffer = referee_data->PowerHeatData.chassis_power_buffer;
     chassis_cmd_send.power_limit = referee_data->GameRobotStatus.chassis_power_limit;
     chassis_cmd_send.is_power_on = referee_data->GameRobotStatus.mains_power_chassis_output;
 
     //gimbal_cmd_send
-    gimbal_cmd_send.yaw_actual_angle = chassis_board_recv_data.yaw_actual_angle;
-    gimbal_cmd_send.yaw_actual_speed = chassis_board_recv_data.yaw_actual_speed;
-    gimbal_cmd_send.yaw_target_angle = chassis_board_recv_data.yaw_target_angle;
-    gimbal_cmd_send.yaw_target_speed = chassis_board_recv_data.yaw_target_speed;
+    gimbal_cmd_send.yaw_actual_angle = chassis_board_recv_data.Freq_1000Hz.yaw_actual_angle;
+    gimbal_cmd_send.yaw_actual_speed = chassis_board_recv_data.Freq_1000Hz.yaw_actual_speed;
+    gimbal_cmd_send.yaw_target_angle = chassis_board_recv_data.Freq_1000Hz.yaw_target_angle;
+    gimbal_cmd_send.yaw_target_speed = chassis_board_recv_data.Freq_1000Hz.yaw_target_speed;
 
-    gimbal_cmd_send.gimbal_mode = chassis_board_recv_data.gimbal_mode;
-    gimbal_cmd_send.auto_aim_mode = chassis_board_recv_data.auto_aim_mode;
+    gimbal_cmd_send.gimbal_mode = chassis_board_recv_data.Freq_50Hz.gimbal_mode;
+    gimbal_cmd_send.auto_aim_mode = chassis_board_recv_data.Freq_50Hz.auto_aim_mode;
 
     //shoot_cmd_send
-    shoot_cmd_send.shoot_mode = chassis_board_recv_data.shoot_mode;
-    shoot_cmd_send.load_mode = chassis_board_recv_data.load_mode;
-    shoot_cmd_send.friction_mode = chassis_board_recv_data.friction_mode;
+    shoot_cmd_send.shoot_mode = chassis_board_recv_data.Freq_50Hz.shoot_mode;
+    shoot_cmd_send.load_mode = chassis_board_recv_data.Freq_50Hz.load_mode;
+    shoot_cmd_send.friction_mode = chassis_board_recv_data.Freq_50Hz.friction_mode;
     shoot_cmd_send.shooter_referee_heat = referee_data->PowerHeatData.shooter_42mm_heat;
 
     //ui_cmd_send
-    ui_cmd_send.ui_refresh_flag = chassis_board_recv_data.ui_refresh_flag;
-    ui_cmd_send.chassis_mode = chassis_board_recv_data.chassis_mode;
-    ui_cmd_send.gimbal_mode = chassis_board_recv_data.gimbal_mode;
-    ui_cmd_send.friction_mode = chassis_board_recv_data.friction_mode;
+    ui_cmd_send.ui_refresh_flag = chassis_board_recv_data.Freq_50Hz.ui_refresh_flag;
+    ui_cmd_send.chassis_mode = chassis_board_recv_data.Freq_50Hz.chassis_mode;
+    ui_cmd_send.gimbal_mode = chassis_board_recv_data.Freq_50Hz.gimbal_mode;
+    ui_cmd_send.friction_mode = chassis_board_recv_data.Freq_50Hz.friction_mode;
     ui_cmd_send.chassis_attitude_angle = gimbal_fetch_data.yaw_motor_single_round_angle;
 
     if (gimbal_board_offline_flag)
@@ -685,7 +722,8 @@ void RobotCMDTask()
 #endif
 
 #ifdef GIMBAL_BOARD
-    chassis_fetch_data.putter_offset = gimbal_board_recv_data.putter_offset;
+    chassis_fetch_data.chassis_real_power = gimbal_board_recv_data.Freq_50Hz.chassis_real_power;
+    chassis_fetch_data.cap_energy = gimbal_board_recv_data.Freq_50Hz.cap_energy;
 
     if (switch_is_up(rc_data[TEMP].rc.switch_left) && (switch_is_down(rc_data[TEMP].rc.switch_right))) // 遥控器拨杆右[上]左[下],键鼠控制
         MouseKeySet();

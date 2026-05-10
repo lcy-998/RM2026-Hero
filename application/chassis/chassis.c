@@ -32,8 +32,10 @@
 // #define CLIMB_STAIRS_TRACK_LOAD_CONFIRM_COUNT 20U
 #define CLIMB_STAIRS_STAGE1_PITCH_THRESHOLD 21.0f
 #define CLIMB_STAIRS_STAGE1_CONFIRM_COUNT 250U
-#define CLIMB_STAIRS_STAGE2_FINISH_PITCH_THRESHOLD 4.0f
+#define CLIMB_STAIRS_STAGE2_PITCH_THRESHOLD 4.0f
 #define CLIMB_STAIRS_STAGE2_CONFIRM_COUNT 250U
+#define CLIMB_STAIRS_STAGE2_FINISH_PITCH_THRESHOLD 1.0f
+#define CLIMB_STAIRS_WAIT_CONFIRM_COUNT 250U
 #define CLIMB_STAIRS_REAR_WHEEL_ASSIST_REF -1200.0f
 #define CLIMB_STAIRS_FRONT_WHEEL_ASSIST_REF -1800.0f
 #define PITCH_BASE_FILTER_COEF 0.01f
@@ -54,9 +56,11 @@ static WattmeterInstance *wattmeter;
 static float chassis_vx, chassis_vy, chassis_vw; // 将云台系的速度投影到底盘
 static float vt_lf, vt_rf, vt_lb, vt_rb;
 static float vxy_k = 1.0f, vw_k = 1.0f;
+static float putter_speed_feedforward_l = 0.0f, putter_speed_feedforward_r = 0.0f;
+static float putter_current_feedforward_l = 0.0f, putter_current_feedforward_r = 0.0f;
 
 typedef enum {
-    //CLIMB_STAIRS_WAIT = 0,
+    CLIMB_STAIRS_WAIT = 0,
     CLIMB_STAIRS_STAGE_1,
     CLIMB_STAIRS_STAGE_2,
 } Climb_Stairs_State_e;
@@ -65,12 +69,12 @@ typedef struct {
     Climb_Stairs_State_e state;
     float pitch_reference;
     float track_current_filtered;
-    uint16_t track_load_count;
+    uint16_t timeout_count;
     uint16_t stage_count;
 } Climb_Stairs_Ctrl_s;
 
 uint8_t calibration_l_finished = 0, calibration_r_finished = 0;//0：未标定，1：标定完成，2：标定异常
-static float putter_l_limit_position = 0.0f, putter_r_limit_position = 0.0f, putter_target_pos = 0.0f;
+static float putter_l_limit_position = 0.0f, putter_r_limit_position = 0.0f, putter_target_pos = 0.0f;//右边上收为正
 static Climb_Stairs_Ctrl_s climb_stairs_ctrl = {.state = CLIMB_STAIRS_STAGE_1};
 #endif
 
@@ -82,19 +86,19 @@ static Climb_Stairs_Ctrl_s climb_stairs_ctrl = {.state = CLIMB_STAIRS_STAGE_1};
 static float GetChassisVwFromPowerLimit(float power_limit)
 {
     if (power_limit < 70.0f) return 3500.0f;
-    if (power_limit < 75.0f) return 3750.0f;
-    if (power_limit < 80.0f) return 4000.0f;
-    if (power_limit < 85.0f) return 4175.0f;
-    if (power_limit < 90.0f) return 4350.0f;
-    if (power_limit < 95.0f) return 4525.0f;
-    if (power_limit < 100.0f) return 4700.0f;
-    if (power_limit < 105.0f) return 4900.0f;
-    if (power_limit < 110.0f) return 5100.0f;
-    if (power_limit < 120.0f) return 5300.0f;
-    if (power_limit < 130.0f) return 5500.0f;
-    if (power_limit < 140.0f) return 5700.0f;
-    if (power_limit < 160.0f) return 6400.0f;
-    if (power_limit < 250.0f) return 7000.0f;
+    else if (power_limit < 75.0f) return 3750.0f;
+    else if (power_limit < 80.0f) return 4000.0f;
+    else if (power_limit < 85.0f) return 4175.0f;
+    else if (power_limit < 90.0f) return 4350.0f;
+    else if (power_limit < 95.0f) return 4525.0f;
+    else if (power_limit < 100.0f) return 4700.0f;
+    else if (power_limit < 105.0f) return 4900.0f;
+    else if (power_limit < 110.0f) return 5100.0f;
+    else if (power_limit < 120.0f) return 5300.0f;
+    else if (power_limit < 130.0f) return 5500.0f;
+    else if (power_limit < 140.0f) return 6000.0f;
+    else if (power_limit < 160.0f) return 8000.0f;
+    else if (power_limit < 250.0f) return 10000.0f;
     return 3000.0f;
 }
 
@@ -115,8 +119,8 @@ static void MecanumCalculate()
 }
 
 float Power_Output;
-const float buffer_energy_loop_kp = 2.0f;
-const float cap_voltage_output_loop_kp = 3.0f;//放电时的kp
+const float buffer_energy_loop_kp = 0.5f;
+const float cap_voltage_output_loop_kp = 5.0f;//放电时的kp
 const float cap_voltage_input_loop_kp = 1.0f;//充电时的kp
 float buffer_power_rectification, cap_power_rectification;
 
@@ -144,7 +148,7 @@ void SuperCapControl()
             cap_power_rectification = (cap_energy_actual - cap_energy_target) * cap_voltage_output_loop_kp;
         else cap_power_rectification = (cap_energy_actual - cap_energy_target) * cap_voltage_input_loop_kp;
         if (cap_power_rectification > 100.0f) cap_power_rectification = 100.0f;
-        else if (cap_power_rectification < -50.0f) cap_power_rectification = -50.0f;
+        else if (cap_power_rectification < -10.0f) cap_power_rectification = -10.0f;
         Power_Output += cap_power_rectification;
         
         Power_Output -= 2.0f; //超电静态功耗
@@ -170,10 +174,15 @@ void SuperCapControl()
 
 static void ClimbStairsResetState()
 {
-    climb_stairs_ctrl.state                  = CLIMB_STAIRS_STAGE_1;
+    climb_stairs_ctrl.state                  = CLIMB_STAIRS_WAIT;
     climb_stairs_ctrl.track_current_filtered = 0.0f;
-    climb_stairs_ctrl.track_load_count       = 0;
+    climb_stairs_ctrl.timeout_count          = 0;
     climb_stairs_ctrl.stage_count            = 0;
+
+    putter_speed_feedforward_l = 0.0f;
+    putter_current_feedforward_l = 0.0f;
+    putter_speed_feedforward_r = 0.0f;
+    putter_current_feedforward_r = 0.0f;
 }
 
 //设置推杆目标值并限幅
@@ -198,7 +207,7 @@ static void ClimbStairsControl()
 
     switch (climb_stairs_ctrl.state)
     {
-        case CLIMB_STAIRS_STAGE_1:
+        case CLIMB_STAIRS_WAIT:
 
             if (chassis_IMU_data->Pitch > CLIMB_STAIRS_STAGE1_PITCH_THRESHOLD)
                 climb_stairs_ctrl.stage_count++;
@@ -207,26 +216,44 @@ static void ClimbStairsControl()
 
             if (climb_stairs_ctrl.stage_count >= CLIMB_STAIRS_STAGE1_CONFIRM_COUNT)
             {
-                climb_stairs_ctrl.state       = CLIMB_STAIRS_STAGE_2;
+                climb_stairs_ctrl.state       = CLIMB_STAIRS_STAGE_1;
                 climb_stairs_ctrl.stage_count = 0;
                 putter_target_pos = PUTTER_DOWN_OFFSET;
+                putter_current_feedforward_l = 8000.0f;
+                putter_current_feedforward_r = -8000.0f;
             }
             break;
 
-        case CLIMB_STAIRS_STAGE_2:
+        case CLIMB_STAIRS_STAGE_1:
 
-            if (chassis_IMU_data->Pitch < CLIMB_STAIRS_STAGE2_FINISH_PITCH_THRESHOLD)
+            if (chassis_IMU_data->Pitch < CLIMB_STAIRS_STAGE2_PITCH_THRESHOLD)
                 climb_stairs_ctrl.stage_count++;
             else
                 climb_stairs_ctrl.stage_count = 0;
 
             if (climb_stairs_ctrl.stage_count >= CLIMB_STAIRS_STAGE2_CONFIRM_COUNT)
             {
+                climb_stairs_ctrl.state       = CLIMB_STAIRS_STAGE_2;
+                climb_stairs_ctrl.stage_count = 0;
+                putter_target_pos = 0.0f;
+                putter_current_feedforward_l = -8000.0f;
+                putter_current_feedforward_r = 8000.0f;
+                putter_speed_feedforward_l = -10000.0f;
+                putter_speed_feedforward_r = 10000.0f;
+            }
+            break;
+        case CLIMB_STAIRS_STAGE_2:
+            if (chassis_IMU_data->Pitch < CLIMB_STAIRS_STAGE2_FINISH_PITCH_THRESHOLD)
+                climb_stairs_ctrl.stage_count++;
+            else
+                climb_stairs_ctrl.stage_count = 0;
+
+            climb_stairs_ctrl.timeout_count++;
+            if (climb_stairs_ctrl.stage_count >= CLIMB_STAIRS_WAIT_CONFIRM_COUNT || climb_stairs_ctrl.timeout_count >= 2500)
+            {
                 ClimbStairsResetState();
                 putter_target_pos = 0.0f;
             }
-            break;
-
             break;
     }
 }
@@ -358,12 +385,12 @@ void ChassisInit()
         .can_init_config.can_handle   = &hcan2,
         .controller_param_init_config = {
             .angle_PID = {
-                .Kp            = 2.5, 
-                .Ki            = 1.2,
+                .Kp            = 2.2, 
+                .Ki            = 0.5,
                 .Kd            = 0,  
-                .IntegralLimit = 4000,
+                .IntegralLimit = 9000,
                 .Improve       = PID_Trapezoid_Intergral | PID_Integral_Limit | PID_Derivative_On_Measurement,
-                .MaxOut        = 7000,
+                .MaxOut        = 18000,
             },
             .speed_PID = {
                 .Kp            = 2.0, // 4.5
@@ -372,22 +399,27 @@ void ChassisInit()
                 .IntegralLimit = 10000,
                 .Improve       = PID_Trapezoid_Intergral | PID_Integral_Limit | PID_Derivative_On_Measurement,
                 .MaxOut        = 16380,
-            }
+            },
         },
         .controller_setting_init_config = {
             .angle_feedback_source = MOTOR_FEED,
             .speed_feedback_source = MOTOR_FEED,
             .outer_loop_type       = ANGLE_LOOP,
             .close_loop_type       = ANGLE_LOOP | SPEED_LOOP,
+            .feedforward_flag      = SPEED_FEEDFORWARD | CURRENT_FEEDFORWARD,
         },
         .motor_type = M3508,
     };
     putter_motor_config.can_init_config.tx_id                             = 1;
     putter_motor_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_NORMAL;
+    putter_motor_config.controller_param_init_config.speed_feedforward_ptr= &putter_speed_feedforward_l;
+    putter_motor_config.controller_param_init_config.current_feedforward_ptr = &putter_current_feedforward_l;
     putter_motor_l = DJIMotorInit(&putter_motor_config);
 
     putter_motor_config.can_init_config.tx_id                             = 4;
     putter_motor_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_NORMAL;
+    putter_motor_config.controller_param_init_config.speed_feedforward_ptr= &putter_speed_feedforward_r;
+    putter_motor_config.controller_param_init_config.current_feedforward_ptr = &putter_current_feedforward_r;
     putter_motor_r = DJIMotorInit(&putter_motor_config);
 
     //履带轮电机初始化
@@ -513,15 +545,17 @@ void ChassisTask()
             cos_theta = arm_cos_f32(chassis_cmd_recv.offset_angle * DEGREE_2_RAD);
             sin_theta = arm_sin_f32(chassis_cmd_recv.offset_angle * DEGREE_2_RAD);
             
-            float target_track_wheel_ref_l = float_constrain(chassis_cmd_recv.vx * cos_theta - chassis_cmd_recv.vy * sin_theta, -TRACK_WHEEL_REF, TRACK_WHEEL_REF) - chassis_cmd_recv.wz * TRACK_WHEEL_TO_CENTER / TRACK_WHEEL_RADIUS;
-            float target_track_wheel_ref_r = float_constrain(chassis_cmd_recv.vx * cos_theta + chassis_cmd_recv.vy * sin_theta, -TRACK_WHEEL_REF, TRACK_WHEEL_REF) + chassis_cmd_recv.wz * TRACK_WHEEL_TO_CENTER / TRACK_WHEEL_RADIUS;
+            float target_track_wheel_ref_l = float_constrain(chassis_cmd_recv.vx * cos_theta - chassis_cmd_recv.vy * sin_theta, -TRACK_WHEEL_REF, TRACK_WHEEL_REF)
+                - float_constrain(chassis_cmd_recv.wz * TRACK_WHEEL_TO_CENTER / TRACK_WHEEL_RADIUS, -0.5 * TRACK_WHEEL_REF, 0.5 * TRACK_WHEEL_REF);
+            float target_track_wheel_ref_r = float_constrain(chassis_cmd_recv.vx * cos_theta + chassis_cmd_recv.vy * sin_theta, -TRACK_WHEEL_REF, TRACK_WHEEL_REF) 
+                + float_constrain(chassis_cmd_recv.wz * TRACK_WHEEL_TO_CENTER / TRACK_WHEEL_RADIUS, -0.5 * TRACK_WHEEL_REF, 0.5 * TRACK_WHEEL_REF);
             DJIMotorSetRef(track_wheel_motor_l, target_track_wheel_ref_l);
             DJIMotorSetRef(track_wheel_motor_r, target_track_wheel_ref_r);
             putter_target_pos += chassis_cmd_recv.putter_offset;
             ramp_init(&rotate_ramp, 250);
             break;
         case CHASSIS_ROTATE: // 自旋,同时保持全向机动;当前wz维持定值,后续增加不规则的变速策略
-            chassis_cmd_recv.wz = 5000;
+            chassis_cmd_recv.wz = GetChassisVwFromPowerLimit(Power_Output);
             cos_theta           = arm_cos_f32((chassis_cmd_recv.offset_angle /*+ 22*/) * DEGREE_2_RAD); // 矫正小陀螺偏心
             sin_theta           = arm_sin_f32((chassis_cmd_recv.offset_angle /*+ 22*/) * DEGREE_2_RAD);
             DJIMotorSetRef(track_wheel_motor_l, 0.0f);

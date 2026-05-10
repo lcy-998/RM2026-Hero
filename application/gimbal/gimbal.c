@@ -39,9 +39,9 @@ void GimbalInit()
         },
         .controller_param_init_config = {
             .angle_PID = {
-                .Kp            = 1.1,//1.8,//0.6, // 0.24, // 0.31, // 0.45
+                .Kp            = 0.8,//1.8,//0.6, // 0.24, // 0.31, // 0.45
                 .Ki            = 0,
-                .Kd            = 0.007,//0.13,//0.07,
+                .Kd            = 0.02,//0.13,//0.07,
                 .DeadBand      = 0.0f,
                 .Improve       = PID_Trapezoid_Intergral | PID_Integral_Limit | PID_Derivative_On_Measurement,
                 .IntegralLimit = 5,
@@ -55,8 +55,8 @@ void GimbalInit()
                 .IntegralLimit = 12000,
                 .MaxOut        = 16384,//25000, // 20000
                 .Output_LPF_RC=1,//0.4,
-                .CoefA=0.2,
-                .CoefB=2,//0.3,
+                .CoefA = 0.2,
+                .CoefB = 2,//0.3,
             },
             .other_angle_feedback_ptr = &gimbal_cmd_recv.yaw_actual_angle,
             .other_speed_feedback_ptr = &gimbal_cmd_recv.yaw_actual_speed,

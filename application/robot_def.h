@@ -30,7 +30,8 @@
 #define TRACK_WHEEL_RADIUS 0.038f       // 履带轮的半径,用于计算履带线速度与角速度的关系
 #define TRACK_WHEEL_TO_CENTER 0.3f // 履带到中心的距离
 
-
+#define FREQ_1000Hz_HEADER 0xA1
+#define FREQ_50Hz_HEADER   0xA5
 
 typedef enum {
     CHASSIS_ZERO_FORCE = 0,    // 电流零输入
@@ -78,8 +79,8 @@ typedef enum {
 } Track_Wheel_Mode_e;
 
 typedef enum {
-    PUTTER_OFF = 0,
-    PUTTER_ON
+    PUTTER_UP = 0,
+    PUTTER_DOWN
 } Putter_Mode_e;
 
 typedef struct
@@ -131,6 +132,7 @@ typedef struct
     float supercap_voltage;
     uint8_t cap_online_flag;
     uint16_t shooter_referee_heat;
+    uint8_t putter_offset; // 推杆位置 0->up 1->down
 } UI_Cmd_s;
 
 typedef struct
@@ -169,44 +171,50 @@ typedef struct
 typedef struct
 {
     uint8_t header; // 数据包头
-    //底盘反馈
-    float putter_offset; //推杆位置
+    struct {
 
-    //裁判系统反馈
-    float bullet_speed;
-    uint8_t enermy_color;
-
-    uint8_t tail; // 数据包尾
+    } Freq_1000Hz;
+    struct {
+        //底盘反馈
+        float chassis_real_power; // 底盘实际功率
+        uint8_t cap_energy;        // 超电能量
+        uint8_t putter_offset; //推杆位置 0->up 1->down
+        //裁判系统反馈
+        float bullet_speed;
+        uint8_t enermy_color;
+    } Freq_50Hz;
 } Chassis_Board_Send_Packet_s;
 
 typedef struct 
 {
     uint8_t header; // 数据包头
-    //底盘控制部分
-    float cmd_vx;
-    float cmd_vy;
-    float cmd_wz;
-    Chassis_Mode_e chassis_mode;
-    SuperCap_Mode_e supercap_flag;
-    float putter_offset;
+    struct {
+        //底盘控制部分
+        float cmd_vx;
+        float cmd_vy;
+        float cmd_wz;
+        //云台控制部分
+        float yaw_actual_angle;
+        float yaw_actual_speed;
+        float yaw_target_angle;
+        float yaw_target_speed;
+    } Freq_1000Hz;
+    
+    struct {
+        Chassis_Mode_e chassis_mode;
+        SuperCap_Mode_e supercap_flag;
+        float putter_offset;
 
-    //云台控制部分
-    float yaw_actual_angle;
-    float yaw_actual_speed;
-    float yaw_target_angle;
-    float yaw_target_speed;
-    Gimbal_Mode_e gimbal_mode;
-    Auto_Aim_Mode_e auto_aim_mode;
+        Gimbal_Mode_e gimbal_mode;
+        Auto_Aim_Mode_e auto_aim_mode;
 
-    //发射控制部分
-    Shoot_Mode_e shoot_mode;
-    Loader_Mode_e load_mode;
-    Friction_Mode_e friction_mode;
-
-    // UI控制部分
-    uint8_t ui_refresh_flag;
-
-    uint8_t tail; // 数据包尾
+        //发射控制部分
+        Shoot_Mode_e shoot_mode;
+        Loader_Mode_e load_mode;
+        Friction_Mode_e friction_mode;
+        // UI控制部分
+        uint8_t ui_refresh_flag;
+    } Freq_50Hz;
 } Gimbal_Board_Send_Packet_s;
 
 typedef struct {

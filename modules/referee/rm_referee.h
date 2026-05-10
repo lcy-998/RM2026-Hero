@@ -64,9 +64,9 @@ typedef struct
    // 0x0301
     ext_map_command_t MapCommand;                             // 0x0303
     ext_map_robot_data_t MapRobotData;                       // 0x0305
+    ext_image_road_cmd_t ImageRoadCmd;                       // 0x0304
     ext_map_data_t MapData;                                   // 0x0307
-    ext_custom_info_t CustomInfo;                             // 0x0308
-
+    ext_custom_info_t CustomInfo;                             // 0x0311
 
     
   

@@ -42,6 +42,7 @@ static Graph_Data_t Shoot_Heat_arc;
 static Graph_Data_t Cap_voltage;      // 电容电压
 static Graph_Data_t total_voltage;      // 电容电压
 static Graph_Data_t Shoot_Local_Heat; // 射击本地热量
+static Graph_Data_t putter_offset; // 推杆位置
 int linex,liney,line,linex1,liney1,width,size;
 //查表计算总允许发射热量
 static float getTotal_heat(uint8_t level){
@@ -80,9 +81,6 @@ static void UI_StaticInit()
 {
     // 清空UI
     UIDelete(&referee_data_for_ui->referee_id, UI_Data_Del_ALL, 0);
-
-
-
    // 射击准心
     //UILineDraw(&crosshairs[0], "crosshairs0", UI_Graph_ADD, 9, UI_Color_Main, 6, SCREEN_LENGTH / 2 - 25, SCREEN_WIDTH / 2 - 25, SCREEN_LENGTH / 2 + 25, SCREEN_WIDTH / 2 + 25);
     // UILineDraw(&shoot_line[0], "ol0", UI_Graph_ADD, 9, UI_Color_Green, 1, SCREEN_LENGTH / 2 - 25, SCREEN_WIDTH / 2 + 5, SCREEN_LENGTH / 2 - 25, SCREEN_WIDTH / 2 - 44);
@@ -131,6 +129,12 @@ static void UI_StaticInit()
     //底盘功率
     // UIArcDraw(&Chassis_Power_arc, "poutline", UI_Graph_ADD, 9, UI_Color_Green, 267, 269, 7, 956, 542, 383, 386);
 
+    //推杆位置
+    sprintf(Char_State[4].show_Data, "Putter");
+    UICharDraw(&Char_State[4], "sc4", UI_Graph_ADD, 7, UI_Color_Orange, 23, 4, 1600, 300, "Putter");
+    UICharRefresh(&referee_data_for_ui->referee_id, Char_State[4]);
+    UIRectangleDraw(&putter_offset, "putter", UI_Graph_ADD, 2, UI_Color_Green, 10, 1600, 500, 1650, 650);
+
     //热量
     UIArcDraw(&Shoot_Heat_arc, "heatline", UI_Graph_ADD, 9, UI_Color_Green, 87, 89, 7, 956, 542, 383, 386);
     //UIFloatDraw(&Shoot_Local_Heat, "of1", UI_Graph_ADD, 4, UI_Color_Green, 15, 3, 3, 1260, 540, (int32_t)(ui_cmd_recv.Shooter_heat * 1000));
@@ -140,7 +144,8 @@ static void UI_StaticInit()
     UIGraphRefresh(&referee_data_for_ui->referee_id, 7, shoot_line[0], shoot_line[1], shoot_line[2], shoot_line[3], shoot_line[4], shoot_line[5], shoot_line[6]);
     UIGraphRefresh(&referee_data_for_ui->referee_id, 7, state_circle[0], state_circle[1], state_circle[2], state_circle[3], Cap_voltage, Shoot_Local_Heat,total_voltage);
     UIGraphRefresh(&referee_data_for_ui->referee_id,7,Cap_voltage_arc,Chassis_Power_arc,benchmark[0], benchmark[1],benchmark[2],benchmark[3],benchmark[4]);
-    UIGraphRefresh(&referee_data_for_ui->referee_id,2,Deviation_arc, Shoot_Heat_arc);  
+    UIGraphRefresh(&referee_data_for_ui->referee_id,2,Deviation_arc, Shoot_Heat_arc);
+    UIGraphRefresh(&referee_data_for_ui->referee_id, 1, putter_offset);
 
 }
 
@@ -209,7 +214,14 @@ void UIDynamicRefresh()
         }
     }
     
-    
+    if (ui_cmd_recv.putter_offset == 0)
+    {
+        UIRectangleDraw(&putter_offset, "putter", UI_Graph_Change, 2, UI_Color_Green, 10, 1600, 500, 1650, 650);
+    }
+    else
+    {
+        UIRectangleDraw(&putter_offset, "putter", UI_Graph_Change, 2, UI_Color_Pink, 10, 1600, 500, 1650, 350);
+    }
 
     // if(ui_cmd_recv.supercap_voltage >= SUPERCAP_HIGHER_THRESHOLD_VOLTAGE){
     //     UIArcDraw(&Cap_voltage_arc, "powerline", UI_Graph_Change, 9, UI_Color_Green, 271, 272 + 60 * (ui_cmd_recv.supercap_voltage - SUPERCAP_MIN_VOLTAGE) / (SUPERCAP_MAX_VOLTAGE - SUPERCAP_MIN_VOLTAGE), 7, 956, 542, 383, 386);
@@ -269,7 +281,7 @@ void UIDynamicRefresh()
     // 动态UI发送
     UIGraphRefresh(&referee_data_for_ui->referee_id, 5, state_circle[0], state_circle[1], state_circle[2], state_circle[3], Cap_voltage);
     UIGraphRefresh(&referee_data_for_ui->referee_id, 5, Shoot_Local_Heat,shoot_line[4],Cap_voltage_arc,Chassis_Power_arc, Shoot_Heat_arc);
-    UIGraphRefresh(&referee_data_for_ui->referee_id, 1, Deviation_arc);
+    UIGraphRefresh(&referee_data_for_ui->referee_id, 2, Deviation_arc, putter_offset);
 
-    PubPushMessage(ui_pub, (void *)&ui_feedback_data);
+    PubPushMessage(ui_pub, (void *)&ui_feedback_data); 
 }
