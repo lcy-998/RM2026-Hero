@@ -230,7 +230,7 @@ typedef struct {
     float pitch_vel;
     float bullet_speed;
     uint16_t bullet_count;
-    uint8_t tail; // 数据包尾
+    uint16_t tail; // 数据包尾
 }NUC_Send_Packet_s;
 
 typedef struct {

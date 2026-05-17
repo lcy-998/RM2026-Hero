@@ -21,6 +21,12 @@ static attitude_t *gimbal_IMU_data;
 static DJIMotorInstance *pitch_motor;
 static float pitch_current_feedforward = 0.0f;
 static float pitch_speed_feedforward = 0.0f;
+extern struct Communication_Flag_s{
+    uint8_t vision_fire_advice;
+    uint8_t vision_detect_flag;
+    uint8_t vision_connect_flag;
+    uint8_t chassis_board_offline_flag;
+} communication_flag;
 #endif
 
 #ifdef CHASSIS_BOARD
@@ -153,7 +159,7 @@ switch (gimbal_cmd_recv.gimbal_mode) {
                     gimbal_cmd_recv.yaw_target_angle = *yaw_motor->motor_controller.other_angle_feedback_ptr + (360 + error);
                 }
             }
-            
+
             DJIMotorSetRef(yaw_motor, gimbal_cmd_recv.yaw_target_angle);
             
             break;

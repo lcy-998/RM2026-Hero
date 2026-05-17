@@ -69,7 +69,7 @@ static Gimbal_Board_Send_Packet_s gimbal_board_send_data;
 static float pitch_control = 0.0f;
 static float yaw_control = 0.0f;
 
-static struct Communication_Flag_s{
+struct Communication_Flag_s{
     uint8_t vision_fire_advice;
     uint8_t vision_detect_flag;
     uint8_t vision_connect_flag;
@@ -231,7 +231,7 @@ static void VisionOfflineCallback(void *instance)
 
 static void VisionRecvCallback()
 {
-    DaemonReload(usb_vision_instance->daemon); 
+    DaemonReload(usb_vision_instance->daemon);
 
     memcpy(&vision_recv_data, usb_vision_instance->comm_instance, sizeof(vision_recv_data));
 
@@ -263,7 +263,7 @@ static void VisionSendMessage()
     vision_send_packet.yaw_vel = gimbal_fetch_data.gimbal_imu_data->Gyro[INS_YAW_ADDRESS_OFFSET];
 
     vision_send_packet.bullet_speed = gimbal_board_recv_data.Freq_50Hz.bullet_speed;
-    vision_send_packet.tail = 0xff;
+    Append_CRC16_Check_Sum((uint8_t *)&vision_send_packet, sizeof(vision_send_packet) - 2);
     
     HostSend(usb_vision_instance, &vision_send_packet, sizeof(vision_send_packet));
 }
