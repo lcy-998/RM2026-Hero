@@ -130,10 +130,10 @@ static void UI_StaticInit()
     // UIArcDraw(&Chassis_Power_arc, "poutline", UI_Graph_ADD, 9, UI_Color_Green, 267, 269, 7, 956, 542, 383, 386);
 
     //推杆位置
-    sprintf(Char_State[4].show_Data, "Putter");
-    UICharDraw(&Char_State[4], "sc4", UI_Graph_ADD, 7, UI_Color_Orange, 23, 4, 1600, 300, "Putter");
-    UICharRefresh(&referee_data_for_ui->referee_id, Char_State[4]);
-    UIRectangleDraw(&putter_offset, "putter", UI_Graph_ADD, 2, UI_Color_Green, 10, 1600, 500, 1650, 650);
+    // sprintf(Char_State[4].show_Data, "Putter");
+    // UICharDraw(&Char_State[4], "sc4", UI_Graph_ADD, 7, UI_Color_Orange, 23, 4, 1600, 300, "Putter");
+    // UICharRefresh(&referee_data_for_ui->referee_id, Char_State[4]);
+    // UIRectangleDraw(&putter_offset, "putter", UI_Graph_ADD, 2, UI_Color_Green, 10, 1600, 500, 1650, 650);
 
     //热量
     UIArcDraw(&Shoot_Heat_arc, "heatline", UI_Graph_ADD, 9, UI_Color_Green, 87, 89, 7, 956, 542, 383, 386);
@@ -214,14 +214,14 @@ void UIDynamicRefresh()
         }
     }
     
-    if (ui_cmd_recv.putter_offset == 0)
-    {
-        UIRectangleDraw(&putter_offset, "putter", UI_Graph_Change, 2, UI_Color_Green, 10, 1600, 500, 1650, 650);
-    }
-    else
-    {
-        UIRectangleDraw(&putter_offset, "putter", UI_Graph_Change, 2, UI_Color_Pink, 10, 1600, 500, 1650, 350);
-    }
+    // if (ui_cmd_recv.putter_offset == 0)
+    // {
+    //     UIRectangleDraw(&putter_offset, "putter", UI_Graph_Change, 2, UI_Color_Green, 10, 1600, 500, 1650, 650);
+    // }
+    // else
+    // {
+    //     UIRectangleDraw(&putter_offset, "putter", UI_Graph_Change, 2, UI_Color_Pink, 10, 1600, 500, 1650, 350);
+    // }
 
     // if(ui_cmd_recv.supercap_voltage >= SUPERCAP_HIGHER_THRESHOLD_VOLTAGE){
     //     UIArcDraw(&Cap_voltage_arc, "powerline", UI_Graph_Change, 9, UI_Color_Green, 271, 272 + 60 * (ui_cmd_recv.supercap_voltage - SUPERCAP_MIN_VOLTAGE) / (SUPERCAP_MAX_VOLTAGE - SUPERCAP_MIN_VOLTAGE), 7, 956, 542, 383, 386);
