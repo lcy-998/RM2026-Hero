@@ -37,6 +37,11 @@ typedef struct
     uint16_t frametail;
 } UI_CharReFresh_t; // 打印字符串数据
 
+typedef struct
+{
+    uint16_t outpost_blood;
+} Custom_Message_t;
+
 #pragma pack()
 
 

@@ -15,6 +15,8 @@
 #include "tool.h"
 #include "super_cap.h"
 #include "rm_referee.h"
+#include "crc_ref.h"
+#include "image_road.h"
 // bsp
 #include "bsp_dwt.h"
 #include "bsp_log.h"
@@ -56,6 +58,7 @@ static uint8_t gimbal_board_offline_flag = 0;
 
 #ifdef GIMBAL_BOARD
 static RC_ctrl_t *rc_data; // 遥控器数据,初始化时返回
+static image_road_info_t *image_road_info;
 static HostInstance *rs485_gimbal_board_instance; // 云台板通信实例,初始化时返回
 static HostInstance *usb_vision_instance; // 上位机接口
 static NUC_Receive_Packet_s vision_recv_data;
@@ -640,6 +643,7 @@ void RobotCMDInit()
 
 #ifdef GIMBAL_BOARD
     rc_data = RemoteControlInit(&huart3);
+    image_road_info = ImageRoadHardwareInit(&huart6);
 
     HostInstanceConf rs485_host_conf = {
         .usart_handle = &huart1,

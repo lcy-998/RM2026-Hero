@@ -407,7 +407,7 @@ typedef enum {
     UI_Data_ID_DrawChar = 0x110,
 
     /* 自定义交互数据部分 */
-    Communicate_Data_ID = 0x0200,
+    Communicate_Data_ID1 = 0x0200,
 
 } Interactive_Data_ID_e;
 /* 交互数据长度 */

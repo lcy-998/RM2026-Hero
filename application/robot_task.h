@@ -98,7 +98,9 @@ __attribute__((noreturn)) void _UITask(void *argument)
     for (;;) {
         
         UIDynamicRefresh();
-        osDelay(10);
+        osDelay(5);
+        MessageCommunication();
+        osDelay(5);
     }
 }
 

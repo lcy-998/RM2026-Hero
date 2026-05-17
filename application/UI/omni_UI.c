@@ -285,3 +285,27 @@ void UIDynamicRefresh()
 
     PubPushMessage(ui_pub, (void *)&ui_feedback_data); 
 }
+
+void MessageCommunication(void)
+{
+    static uint8_t buffer[512];
+    uint8_t temp_datalength = LEN_HEADER + LEN_CMDID + Interactive_Data_LEN_Head + sizeof(Custom_Message_t) + LEN_TAIL;
+    UI_GraphReFresh_t UI_GraphReFresh_data;
+    UI_GraphReFresh_data.FrameHeader.SOF        = REFEREE_SOF;
+    UI_GraphReFresh_data.FrameHeader.DataLength = Interactive_Data_LEN_Head + sizeof(Custom_Message_t);
+    UI_GraphReFresh_data.FrameHeader.Seq        = UI_Seq;
+    UI_GraphReFresh_data.FrameHeader.CRC8       = Get_CRC8_Check_Sum((uint8_t *)&UI_GraphReFresh_data, LEN_CRC8, 0xFF);
+
+    UI_GraphReFresh_data.CmdID = ID_student_interactive;
+    UI_GraphReFresh_data.datahead.data_cmd_id = Communicate_Data_ID1;
+    UI_GraphReFresh_data.datahead.sender_ID = referee_data_for_ui->referee_id.Robot_ID;
+    UI_GraphReFresh_data.datahead.receiver_ID = (referee_data_for_ui->referee_id.Robot_ID == 0x01) ? 0x07 : 0x107;
+
+    memcpy(buffer, (uint8_t *)&UI_GraphReFresh_data, LEN_HEADER + LEN_CMDID + Interactive_Data_LEN_Head);
+
+    Custom_Message_t custom_message;
+    custom_message.outpost_blood = custom_message.outpost_blood++;
+    memcpy(buffer + LEN_HEADER + LEN_CMDID + Interactive_Data_LEN_Head, (uint8_t *)&custom_message, sizeof(Custom_Message_t));
+    Append_CRC16_Check_Sum(buffer, temp_datalength);
+    RefereeSend(buffer, temp_datalength);
+}
