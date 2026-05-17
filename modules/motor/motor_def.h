@@ -76,6 +76,12 @@ typedef struct {
     float T_max;
 } Motor_Control_Range_s;
 
+typedef enum
+{
+    Cascade_PID = 0,
+    Parallel_PID,
+} PID_Struct_Type_e;
+
 /* 电机控制设置,包括闭环类型,反转标志和反馈来源 */
 typedef struct
 {
@@ -97,6 +103,8 @@ typedef struct
     float *other_speed_feedback_ptr;
     float *speed_feedforward_ptr;
     float *current_feedforward_ptr;
+
+    PID_Struct_Type_e pid_struct_type;
 
     PIDInstance current_PID;
     PIDInstance speed_PID;
@@ -134,6 +142,8 @@ typedef struct
 
     float *speed_feedforward_ptr;   // 速度前馈数据指针
     float *current_feedforward_ptr; // 电流前馈数据指针
+
+    PID_Struct_Type_e pid_struct_type;
 
     PID_Init_Config_s current_PID;
     PID_Init_Config_s speed_PID;

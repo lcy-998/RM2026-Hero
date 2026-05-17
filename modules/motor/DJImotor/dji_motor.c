@@ -201,6 +201,7 @@ DJIMotorInstance *DJIMotorInit(Motor_Init_Config_s *config)
     instance->motor_controller.other_speed_feedback_ptr = config->controller_param_init_config.other_speed_feedback_ptr;
     instance->motor_controller.current_feedforward_ptr  = config->controller_param_init_config.current_feedforward_ptr;
     instance->motor_controller.speed_feedforward_ptr    = config->controller_param_init_config.speed_feedforward_ptr;
+    instance->motor_controller.pid_struct_type          = config->controller_param_init_config.pid_struct_type;
     // 后续增加电机前馈控制器(速度和电流)
 
     // 电机分组,因为至多4个电机可以共用一帧CAN控制报文
@@ -299,14 +300,22 @@ void DJIMotorControl()
             
         // 计算速度环,(外层闭环为速度或位置)且(启用速度环)时会计算速度环
         if ((motor_setting->close_loop_type & SPEED_LOOP) && (motor_setting->outer_loop_type & (ANGLE_LOOP | SPEED_LOOP))) {
-            if (motor_setting->feedforward_flag & SPEED_FEEDFORWARD)
-                pid_ref += *motor_controller->speed_feedforward_ptr;
             if (motor_setting->speed_feedback_source == OTHER_FEED)
                 pid_measure = *motor_controller->other_speed_feedback_ptr;
             else // MOTOR_FEED
                 pid_measure = measure->speed_aps;
-            // 更新pid_ref进入下一个环
-            pid_ref = PIDCalculate(&motor_controller->speed_PID, pid_measure, pid_ref);
+            if (motor_controller->pid_struct_type == Cascade_PID)
+            {
+                if (motor_setting->feedforward_flag & SPEED_FEEDFORWARD)
+                    pid_ref += *motor_controller->speed_feedforward_ptr;
+                // 更新pid_ref进入下一个环
+                pid_ref = PIDCalculate(&motor_controller->speed_PID, pid_measure, pid_ref);
+            }
+            else if (motor_controller->pid_struct_type == Parallel_PID)
+            {
+                pid_ref += PIDCalculate(&motor_controller->speed_PID, pid_measure, *motor_controller->speed_feedforward_ptr);
+            }
+            
         }
 
 

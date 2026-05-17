@@ -182,6 +182,7 @@ static void GimbalBoardSend()
     gimbal_board_send_data.Freq_1000Hz.yaw_actual_speed = gimbal_fetch_data.gimbal_imu_data->Gyro[INS_YAW_ADDRESS_OFFSET];
     gimbal_board_send_data.Freq_1000Hz.yaw_target_angle = gimbal_cmd_send.yaw_target_angle;
     gimbal_board_send_data.Freq_1000Hz.yaw_target_speed = gimbal_cmd_send.yaw_target_speed;
+    gimbal_board_send_data.Freq_1000Hz.yaw_target_acc   = gimbal_cmd_send.yaw_target_acc;
 
     if (send_count % 20 == 0)
     {
@@ -193,7 +194,14 @@ static void GimbalBoardSend()
 
         //云台控制
         gimbal_board_send_data.Freq_50Hz.gimbal_mode = gimbal_cmd_send.gimbal_mode;
-        gimbal_board_send_data.Freq_50Hz.auto_aim_mode = gimbal_cmd_send.auto_aim_mode;
+        if (gimbal_cmd_send.auto_aim_mode == AUTO_AIM_ON && communication_flag.vision_detect_flag != 0)
+        {
+            gimbal_board_send_data.Freq_50Hz.auto_aim_mode = AUTO_AIM_ON;
+        }
+        else
+        {
+            gimbal_board_send_data.Freq_50Hz.auto_aim_mode = AUTO_AIM_OFF;
+        }
 
         //发射控制
         gimbal_board_send_data.Freq_50Hz.shoot_mode = shoot_cmd_send.shoot_mode;
@@ -224,6 +232,7 @@ static void VisionOfflineCallback(void *instance)
 static void VisionRecvCallback()
 {
     DaemonReload(usb_vision_instance->daemon); 
+
     memcpy(&vision_recv_data, usb_vision_instance->comm_instance, sizeof(vision_recv_data));
 
     communication_flag.vision_detect_flag = !(!vision_recv_data.mode);
@@ -231,7 +240,6 @@ static void VisionRecvCallback()
 
     if (!communication_flag.vision_connect_flag)
     {
-        
         communication_flag.vision_connect_flag = 1;
     }
 }
@@ -699,6 +707,7 @@ void RobotCMDTask()
     gimbal_cmd_send.yaw_actual_speed = chassis_board_recv_data.Freq_1000Hz.yaw_actual_speed;
     gimbal_cmd_send.yaw_target_angle = chassis_board_recv_data.Freq_1000Hz.yaw_target_angle;
     gimbal_cmd_send.yaw_target_speed = chassis_board_recv_data.Freq_1000Hz.yaw_target_speed;
+    gimbal_cmd_send.yaw_target_acc   = chassis_board_recv_data.Freq_1000Hz.yaw_target_acc;
 
     gimbal_cmd_send.gimbal_mode = chassis_board_recv_data.Freq_50Hz.gimbal_mode;
     gimbal_cmd_send.auto_aim_mode = chassis_board_recv_data.Freq_50Hz.auto_aim_mode;
@@ -740,6 +749,8 @@ void RobotCMDTask()
     }
     gimbal_cmd_send.pitch_target_speed = vision_recv_data.pitch_vel;
     gimbal_cmd_send.yaw_target_speed = vision_recv_data.yaw_vel;
+    gimbal_cmd_send.pitch_target_acc = vision_recv_data.pitch_acc;
+    gimbal_cmd_send.yaw_target_acc = vision_recv_data.yaw_acc;
     VisionSendMessage();
     GimbalBoardSend();
 #endif

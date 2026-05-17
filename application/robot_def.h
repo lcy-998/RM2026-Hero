@@ -104,10 +104,12 @@ typedef struct
 {
     float yaw_target_angle;
     float yaw_target_speed;
+    float yaw_target_acc;
     float yaw_actual_angle;
     float yaw_actual_speed;
     float pitch_target_angle;
     float pitch_target_speed;
+    float pitch_target_acc;
     Auto_Aim_Mode_e auto_aim_mode; 
     Gimbal_Mode_e gimbal_mode;
 } Gimbal_Ctrl_Cmd_s;
@@ -198,6 +200,7 @@ typedef struct
         float yaw_actual_speed;
         float yaw_target_angle;
         float yaw_target_speed;
+        float yaw_target_acc;
     } Freq_1000Hz;
     
     struct {
