@@ -148,7 +148,7 @@ void SuperCapControl()
             cap_power_rectification = (cap_energy_actual - cap_energy_target) * cap_voltage_output_loop_kp;
         else cap_power_rectification = (cap_energy_actual - cap_energy_target) * cap_voltage_input_loop_kp;
         if (cap_power_rectification > 100.0f) cap_power_rectification = 100.0f;
-        else if (cap_power_rectification < -10.0f) cap_power_rectification = -10.0f;
+        else if (cap_power_rectification < -5.0f) cap_power_rectification = -5.0f;
         Power_Output += cap_power_rectification;
         
         Power_Output -= 2.0f; //超电静态功耗
@@ -465,9 +465,9 @@ void ChassisInit()
 
     SuperCap_Init_Config_s supercap_config = {
         .can_config = {
-            .can_handle = &hcan1,
-            .tx_id      = 0x001,
-            .rx_id      = 0x100,
+            .can_handle = &hcan2,
+            .tx_id      = 0x180,
+            .rx_id      = 0x185,
         },
     };
     supercap = SuperCapRegister(&supercap_config);
